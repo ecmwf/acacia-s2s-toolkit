@@ -1,0 +1,35 @@
+[project]
+name = "acacia_s2s_toolkit"
+authors = [
+  {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
+]
+version = "0.0.1"
+description = "A python package to support download and analysis of forecasts from WMO sub-seasonal lead centre."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+                "numpy>=1.23",
+                "xarray>=2024.09.0",
+                "dask>=2024.9.0",
+                "pandas>=2.2.3",
+                "scipy>=1.14.1",
+                "netCDF4>=1.7.2",
+                "requests>=2.32.2",
+                "matplotlib>=3.8",
+                "cartopy>=0.22",
+]
+
+[project.urls]
+Homepage = "https://github.com/joshuatalib/acacia_s2s_toolkit"
+
+# build system
+[build-system]
+requires = ["setuptools","wheel"]
+build-backend = "setuptools.build_meta"
+
