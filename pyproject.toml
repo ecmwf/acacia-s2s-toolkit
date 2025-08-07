@@ -3,7 +3,7 @@ name = "acacia_s2s_toolkit"
 authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
 ]
-version = "0.0.1"
+version = "0.0.3"
 description = "A python package to support download and analysis of forecasts from WMO sub-seasonal lead centre."
 readme = "README.md"
 requires-python = ">=3.8"
