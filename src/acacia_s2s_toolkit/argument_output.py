@@ -1,5 +1,6 @@
 # output suitable ECDS variables in light of requested forecasts.
 from acacia_s2s_toolkit.variable_dict import s2s_variables, webAPI_params, model_origin, forecast_length_hours, forecast_pert_members
+from acacia_s2s_toolkit import argument_check
 import numpy as np
 
 def get_endtime(origin_id):
@@ -128,3 +129,56 @@ def output_plevs(variable):
     print (f"Selected the following pressure levels: {plevs}")
     
     return plevs
+
+def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour):
+    # check variable name. Is the variable name one of the abbreviations?
+    argument_check.check_requested_variable(variable)
+    # is it a sfc or pressure level field. # output sfc or level type
+    level_type = output_sfc_or_plev(variable)
+
+    # if level_type == plevs and plevs=None, output_plevs. Will only give troposphere for q. 
+    # work out appropriate pressure levels
+    if level_type == 'pressure':
+        if plevs is None:
+            plevs = output_plevs(variable)
+        else:
+            print (f"Downloading the requested pressure levels: {plevs}") # if not, use request plevs.
+        # check plevs
+        argument_check.check_plevs(plevs,variable)
+    else:
+        print (f"Downloading the following level type: {level_type}")
+        plevs=None
+
+    # get ECDS version of variable name. - WILL WRITE UP IN OCTOBER 2025!
+    #ecds_varname = variable_output.output_ECDS_variable_name(variable)
+    ecds_varname=None
+
+    # get webapi param
+    webapi_param = output_webapi_variable_name(variable) # temporary until move to ECDS (Aug - Oct).
+
+    # check model is in acceptance list and get origin code!
+    argument_check.check_model_name(model)
+    # get origin id
+    origin_id = output_originID(model)
+
+    # if leadtime_hour = None, get leadtime_hour (output all hours).
+    if leadtime_hour is None:
+        leadtime_hour = output_leadtime_hour(variable,origin_id) # the function outputs an array of hours. This is the leadtime used during download.
+    print (f"For the following variable '{variable}' using the following leadtimes '{leadtime_hour}'.")
+
+    # check fcdate.
+    argument_check.check_fcdate(fcdate,origin_id)
+
+    # check dataformat
+    argument_check.check_dataformat(data_format)
+
+    # check leadtime_hours (as individuals can choose own leadtime_hours).
+    argument_check.check_leadtime_hours(leadtime_hour,variable,origin_id)
+
+    # check area selection
+    argument_check.check_area_selection(area)
+
+    return level_type, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour
+
+
+
