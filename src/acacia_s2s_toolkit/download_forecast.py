@@ -97,13 +97,13 @@ def webAPI_request_forecast(fcdate,origin,grid,variable,data_format,webapi_param
     
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # smae process following even with one forecast initialisation date to ensure same structure for all output. 
-    combined_forecast = merge_all_ens_members(f'{filename}')
+    combined_forecast = merge_all_ens_members(f'{filename}',leveltype)
     combined_forecast.to_netcdf(f'{filename}.nc')
 
     # remove previous files  
     os.system(f'rm {filename}_control* {filename}_perturbed* {filename}_allens*')
 
-def merge_all_ens_members(filename):
+def merge_all_ens_members(filename,leveltype):
     # open all ensemble members. drop step and time variables. Just use valid time.
     all_fcs = xr.open_mfdataset(f'{filename}_allens_*',engine='cfgrib',combine='nested',concat_dim='step') # open mfdataset but have step as a dimension
     all_fcs = all_fcs.drop_vars(['step','time'])
@@ -122,7 +122,10 @@ def merge_all_ens_members(filename):
         member_stack = member_stack.expand_dims(time=[time])
         member_based_fcs.append(member_stack)
     combined = xr.concat(member_based_fcs,dim='time')
-    combined = combined.transpose('time','member','latitude','longitude')
+    if leveltype == 'pressure':
+        combined = combined.transpose('time','member','level','latitude','longitude')
+    else:
+        combined = combined.transpose('time','member','latitude','longitude')
 
     return combined 
 
