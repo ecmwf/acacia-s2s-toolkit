@@ -163,4 +163,11 @@ def check_area_selection(area):
                 f"[ERROR] Western longitude {area[1]} must be smaller than eastern longitude {area[3]}."
             )
 
+def check_fc_enslags(fc_enslags):
+    """
+    Check that all values in fc_enslags are non-positive integers (i.e., ≤ 0 and whole numbers).
+    Raises ValueError if check fails.
+    """
+    if not all(isinstance(lag, int) and lag <= 0 for lag in fc_enslags):
+        raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
 

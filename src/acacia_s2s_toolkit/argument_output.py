@@ -1,7 +1,8 @@
 # output suitable ECDS variables in light of requested forecasts.
-from acacia_s2s_toolkit.variable_dict import s2s_variables, webAPI_params, model_origin, forecast_length_hours, forecast_pert_members
+from acacia_s2s_toolkit.variable_dict import s2s_variables, webAPI_params, model_origin, forecast_length_hours, forecast_pert_members, day_fclag_ensemble
 from acacia_s2s_toolkit import argument_check
 import numpy as np
+from datetime import datetime
 
 def get_endtime(origin_id):
     # next find maximum end time
@@ -130,7 +131,29 @@ def output_plevs(variable):
     
     return plevs
 
-def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour):
+    # get lagged ensemble details
+    fc_enslags = output_fc_lags(origin_id)
+
+def output_fc_lags(origin_id,fcdate):
+    '''
+    Given origin_id, output lagged ensemble forecasts.
+    return array with day lag positions, i.e. [0,-1,-2].
+    '''
+    if origin_id not in day_fclag_ensemble:
+        raise ValueError(f"[ERROR] No forecast lags found for origin_id '{origin_id}'.")
+
+    # Special handling for CPTEC (sbsj). Initialisation only given for Wednesday and Thursday.
+    if origin_id == 'sbsj':
+        date_obj = datetime.strptime(fcdate, '%Y%m%d')
+        weekday = date_obj.weekday()+1  # Monday = 1, ..., Sunday = 7
+        if weekday == 4:  # Thursday
+            return [0, -1]
+        else:
+            return [0]
+    # Return the list from the dictionary
+    return day_fclag_ensemble[origin_id]
+
+def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags):
     # check variable name. Is the variable name one of the abbreviations?
     argument_check.check_requested_variable(variable)
     # is it a sfc or pressure level field. # output sfc or level type
@@ -166,6 +189,12 @@ def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,p
         leadtime_hour = output_leadtime_hour(variable,origin_id) # the function outputs an array of hours. This is the leadtime used during download.
     print (f"For the following variable '{variable}' using the following leadtimes '{leadtime_hour}'.")
 
+    # get lagged ensemble details
+    if fc_enslags is None:
+        fc_enslags = output_fc_lags(origin_id,fcdate)
+    # after gathering fc_enslags, check all ensemble lags are negative or zero and whole numbers as they can be user-inputted.
+    argument_check.check_fc_enslags(fc_enslags)
+
     # check fcdate.
     argument_check.check_fcdate(fcdate,origin_id)
 
@@ -178,7 +207,7 @@ def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,p
     # check area selection
     argument_check.check_area_selection(area)
 
-    return level_type, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour
+    return level_type, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour, fc_enslags
 
 
 

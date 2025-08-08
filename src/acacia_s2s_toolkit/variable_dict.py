@@ -70,7 +70,14 @@ model_origin={
         "HMCR":"rums",
         "JMA":"rjtd",
         "KMA":"rksl",
-        "NCEP":"kwbc"
+        "NCEP":"kwbc",
+        "BOM":"ammc",
+        "CMA":"babj",
+        "CNR-ISAC":"isac",
+        "CNRM":"lfpw",
+        "CPTEC":"sbsj",
+        "IAP-CAS":"anso",
+        "UKMO":"egrr"
         }
 
 origin_latency_hours={
@@ -139,4 +146,22 @@ forecast_pert_members={
         "kwbc":15,
         "egrr":4
         }
+
+# default_lag_ensemble
+day_fclag_ensemble={
+        "ammc":[0],
+        "babj":[0],
+        "isac":[0],
+        "lfpw":[0],
+        "sbsj":[0],
+        "cwao":[0],
+        "ecmf":[0],
+        "rums":[0],
+        "anso":[0],
+        "rjtd":[0,-1,-2],
+        "rksl":[0,-1,-2],
+        "kwbc":[0,-1],
+        "egrr":[0,-1,-2]
+        }
+
 
