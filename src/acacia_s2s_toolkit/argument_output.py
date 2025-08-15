@@ -1,13 +1,13 @@
 # output suitable ECDS variables in light of requested forecasts.
-from acacia_s2s_toolkit.variable_dict import s2s_variables, webAPI_params, model_origin, forecast_length_hours, forecast_pert_members, day_fclag_ensemble
-from acacia_s2s_toolkit import argument_check
+from acacia_s2s_toolkit import variable_dict, argument_check
 import numpy as np
-from datetime import datetime
+import pandas as pd
+from datetime import datetime, timedelta
 
 def get_endtime(origin_id):
     # next find maximum end time
     end_time=None
-    for originID, fc_length in forecast_length_hours.items():
+    for originID, fc_length in variable_dict.forecast_length_hours.items():
         if originID == origin_id:
             end_time=fc_length
             break
@@ -21,7 +21,7 @@ def get_endtime(origin_id):
 def get_num_pert_fcs(origin_id):
     # find number pert. forecasts
     num_pert_fcs=None
-    for originID, num_fc_ens in forecast_pert_members.items():
+    for originID, num_fc_ens in variable_dict.forecast_pert_members.items():
         if originID == origin_id:
             num_pert_fcs=num_fc_ens
             break
@@ -32,10 +32,24 @@ def get_num_pert_fcs(origin_id):
 
     return num_pert_fcs
 
+def get_num_pert_hcs(origin_id):
+    # find number pert. forecasts
+    num_pert_hcs=None
+    for originID, num_hc_ens in variable_dict.reforecast_pert_members.items():
+        if originID == origin_id:
+            num_pert_hcs=num_hc_ens
+            break
+
+    if num_pert_hcs is None:
+        print (f"[ERROR] could not find number pert. reforecasts for originID '{origin_id}'.")
+        return None
+
+    return num_pert_hcs
+
 def get_timeresolution(variable):
     # first find which sub-category the variable sits in
     time_resolution=None
-    for category_name, category_dict in s2s_variables.items():
+    for category_name, category_dict in variable_dict.s2s_variables.items():
         for subcategory_name, subcategory_vars in category_dict.items():
             if variable in subcategory_vars:
                 time_resolution = subcategory_name
@@ -75,7 +89,7 @@ def output_sfc_or_plev(variable):
     '''
     # Flatten all variables from nested dictionary
     level_type=None
-    for category_name, category_dict in s2s_variables.items():
+    for category_name, category_dict in variable_dict.s2s_variables.items():
         for subcategory_vars in category_dict.values():
             if variable in subcategory_vars:
                 level_type = category_name
@@ -90,7 +104,7 @@ def output_webapi_variable_name(variable):
     return webAPI paramID.
 
     '''
-    for variable_abb, webapi_code in webAPI_params.items():
+    for variable_abb, webapi_code in variable_dict.webAPI_params.items():
         if variable == variable_abb:
             return webapi_code
     print (f"[ERROR] No webAPI paramID found for '{variable}'.")
@@ -102,7 +116,7 @@ def output_originID(model):
     return originID.
 
     '''
-    for modelname, originID in model_origin.items():
+    for modelname, originID in variable_dict.model_origin.items():
         if model == modelname:
             return originID
     print (f"[ERROR] No originID found for '{model}'.")
@@ -131,15 +145,12 @@ def output_plevs(variable):
     
     return plevs
 
-    # get lagged ensemble details
-    fc_enslags = output_fc_lags(origin_id)
-
 def output_fc_lags(origin_id,fcdate):
     '''
     Given origin_id, output lagged ensemble forecasts.
     return array with day lag positions, i.e. [0,-1,-2].
     '''
-    if origin_id not in day_fclag_ensemble:
+    if origin_id not in variable_dict.day_fclag_ensemble:
         raise ValueError(f"[ERROR] No forecast lags found for origin_id '{origin_id}'.")
 
     # Special handling for CPTEC (sbsj). Initialisation only given for Wednesday and Thursday.
@@ -151,9 +162,205 @@ def output_fc_lags(origin_id,fcdate):
         else:
             return [0]
     # Return the list from the dictionary
-    return day_fclag_ensemble[origin_id]
+    return variable_dict.day_fclag_ensemble[origin_id]
 
-def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags):
+def output_hc_lags(origin_id,fcdate):
+    '''
+    Given origin_id, outputted the best lags for downloading reforecasts
+    '''
+    if origin_id not in variable_dict.rf_lag_info:
+        raise ValueError(f"[ERROR] No forecast lags found for origin_id '{origin_id}'.")
+
+    fcdate_obj = datetime.strptime(fcdate, '%Y%m%d')
+    weekday = fcdate_obj.weekday()+1  # Monday = 1, ..., Sunday = 7
+    dayofmonth = fcdate_obj.day
+
+    lag_info = variable_dict.rf_lag_info[origin_id]
+
+    # ---- Nearest DOM (single closest) -------
+    if 'nearestDOM' in lag_info: # DOMs. get closest lags
+        rf_freq_info = lag_info['nearestDOM']
+
+        # Build candidate reforecast dates in prev/current/next month
+        candidates = []
+        for offset_month in [-1, 0, 1]:
+            # Month/year shift
+            month = (fcdate_obj.month - 1 + offset_month) % 12 + 1
+            year = fcdate_obj.year + ((fcdate_obj.month - 1 + offset_month) // 12)
+            for dom in rf_freq_info:
+                try:
+                    candidates.append(datetime(year, month, dom))
+                except ValueError:
+                    continue  # skip invalid dates (e.g., Feb 30)
+
+        # Find the one with smallest abs(lag)
+        closest_rf = min(candidates, key=lambda d: abs((d - fcdate_obj).days))
+        lag = (closest_rf - fcdate_obj).days
+        return lag
+    # ------ Before/after DOM -----------------
+    if 'before_after_DOM' in lag_info:
+        rf_freq_info = lag_info['before_after_DOM']
+
+        # Build candidate reforecast dates in prev/current/next month
+        candidates = []
+        for offset_month in [-1, 0, 1]:
+            # Month/year shift
+            month = (fcdate_obj.month - 1 + offset_month) % 12 + 1
+            year = fcdate_obj.year + ((fcdate_obj.month - 1 + offset_month) // 12)
+            for dom in rf_freq_info:
+                try:
+                    candidates.append(datetime(year, month, dom))
+                except ValueError:
+                    continue  # skip invalid dates (e.g., Feb 30)
+
+        lags = [(c-fcdate_obj).days for c in candidates]
+
+        neg_lags = [l for l in lags if l < 0]
+        pos_lags = [l for l in lags if l >= 0]
+
+        largest_neg = max(neg_lags) if neg_lags else None
+        smallest_pos = min(pos_lags) if pos_lags else None
+
+        return [largest_neg,smallest_pos] # before and after lags
+    # ------ daily reforecast initialisations ------
+    if 'daily_lagged' in lag_info:
+        return lag_info['daily_lagged']
+
+    # ------ Weekday based (i.e. only Monday and Thursday reforecasts)-----
+    if 'weekday_based' in lag_info:
+        mode = lag_info['weekday_based']
+        # two options depending on whether fcdate is a Monday or Thursday
+        if weekday == 4: # Thursday
+            return [-3,0,4]
+        elif weekday == 1: # Monday
+            return [-4,0,3]
+        else:
+            raise ValueError(f"[ERROR] For origin_id '{origin_id}' forecasts are only every Monday and Thursday, therefore a Monday or Thursday forecast date must be selected.")
+
+    # ---- Unique modes  ------
+    if 'unique' in lag_info:
+        mode = lag_info['unique']
+
+        # ECMWF ---- odd day reforecasts.
+        if mode == 'odddates':
+            if (dayofmonth % 2 == 0) or (dayofmonth == 29 and fcdate_obj.month() == 2):
+                return [-1,1] # for even fcdates (or 29th Feb) chosen rfdate before and after forecast date.
+            else:
+                return [-2,0] # for odd dates, choosen current day, minus 2. 
+        if mode == 'CNRevery5days': # roughly five days
+            # make an array of dates from 2020-01-01 to 2020-12-27
+            DOM = {1:[1,6,11,16,21,26,31],2:[5,10,15,20,25],3:[2,7,12,17,22,27],4:[1,6,11,16,21,26],5:[1,6,11,16,21,26,31],6:[5,10,15,20,25,30],7:[5,10,15,20,25,30],8:[4,9,14,19,24,29],9:[3,8,13,18,23,28],10:[3,8,13,18,23,28],11:[2,7,12,17,22,27],12:[2,7,12,17,22,27]}
+            CNR_rf_dates = []
+            for year in (2020,2021):
+                for month, days in DOM.items():
+                    for day in days:
+                        CNR_rf_dates.append(datetime(year,month,day))
+            # change year of fcdate to 2020-fcdate(MM)-fcdate(DD)
+            fc_date_2020 = datetime.strptime(f"2020{fcdate[4:]}",'%Y%m%d')
+            # nearest date to altered fcdate is rf_date
+            closest_day=min(CNR_rf_dates,key=lambda x:abs(fc_date_2020-x))
+            lag = (closest_day - fc_date_2020).days
+            return lag
+        if mode == 'JMAtwicepermonth': # twice per month
+            # make an array of dates from 2020-01-01 to 2020-12-27
+            DOM = {1:[16,31],2:[10,25],3:[12,27],4:[11,26],5:[16,31],6:[15,30],7:[15,30],8:[14,29],9:[13,28],10:[13,28],11:[12,27],12:[12,27]}
+            JMA_rf_dates = []
+            for year in (2019,2020,2021):
+                for month, days in DOM.items():
+                    for day in days:
+                        JMA_rf_dates.append(datetime(year,month,day))
+            # change year of fcdate to 2020-fcdate(MM)-fcdate(DD)
+            fc_date_2020 = datetime.strptime(f"2020{fcdate[4:]}",'%Y%m%d')
+
+            lags = [(c-fc_date_2020).days for c in JMA_rf_dates]
+            neg_lags = [l for l in lags if l < 0]
+            pos_lags = [l for l in lags if l >= 0]
+
+            largest_neg = max(neg_lags) if neg_lags else None
+            smallest_pos = min(pos_lags) if pos_lags else None
+
+            return [largest_neg,smallest_pos] 
+
+def get_hindcast_model_date(origin_id,hcdate):
+    ''' Given origin_id, output appropriate date for reforecast dataset. This is the hindcast model version, not the set of reforecast dates.
+    '''
+    
+    if origin_id not in variable_dict.reforecast_model_freq:
+        raise ValueError(f"[ERROR] No reforecast model frequency found for origin_id '{origin_id}'.")
+  
+    rf_model_freq = variable_dict.reforecast_model_freq[origin_id]
+
+    if isinstance(rf_model_freq,dict) and "fixed" in rf_model_freq:
+        mrf_date = rf_model_freq["fixed"]
+    else:
+        mrf_date = hcdate
+
+    return mrf_date
+        
+def get_hindcast_year_span(origin_id,fcdate):
+    ''' Given origin_id, output appropriate set of years for reforecasts.
+    '''
+    if origin_id not in variable_dict.reforecast_years:
+        raise ValueError(f"[ERROR] No reforecast years found for origin_id '{origin_id}'.")
+
+    rf_yrs = variable_dict.reforecast_years[origin_id] # description of reforecast years
+
+    if "fixed" in rf_yrs:
+        start, end = rf_yrs["fixed"]
+        rf_years = np.arange(start,end+1) # give full set of years, i.e. 1981, 1982, ..., 2013.
+    elif "dynamic" in rf_yrs:
+        n_years = rf_yrs["dynamic"]
+        fc_year = int(fcdate[:4]) # get year component of date.
+        rf_years = np.arange(fc_year - n_years,fc_year)
+    else:
+        raise ValueError(f"[ERROR] Couldn't compute appropriate reforecast years for origin_id '{origin_id}'.")
+
+    return rf_years
+
+def output_formatted_leadtimes(leadtime_hour,fcdate,variable,lag=0,fc_enslags=0):
+    # create new fcdate based on lag
+    new_fcdate = datetime.strptime(fcdate, '%Y%m%d')+timedelta(days=lag)
+    convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
+
+    # convert leadtimes
+    # is it an average field?
+    time_resolution = get_timeresolution(variable)
+    # if an average field, use '0-24/24-48/48-72...'
+    leadtime_hour_copy = leadtime_hour[:]
+
+    # need to ensure correct selection of lead time given lag. Essentially all members should sample same forecast period.
+    max_lag = np.abs(np.min(fc_enslags))
+    lag_minus_1 = lag*-1
+    lag_end = (max_lag-lag_minus_1)*-1
+
+    if time_resolution.startswith('aver'):
+        if lag_end == 0:
+            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1:]
+        else:
+            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1:lag_end]
+        leadtimes='/'.join(f"{leadtime_hour_copy[i]}-{leadtime_hour_copy[i]+24}" for i in range(len(leadtime_hour_copy)-1))
+    else: # instantaneous field
+        nsteps_per_day = 4
+        if lag_end == 0:
+            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1*nsteps_per_day:]
+        else:
+            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1*nsteps_per_day:lag_end*nsteps_per_day]
+        leadtimes = '/'.join(str(x) for x in leadtime_hour_copy)
+    print (leadtimes)
+    return leadtimes, convert_fcdate
+
+def create_reforecast_dates(rfyears,rfdate):
+    ''' function that produces a list of reforecast dates given set of years and chosen reforecast date
+    '''
+    if np.size(rfdate) == 1: # for a single reforecast date that is then repeated for all reforecast years
+        DOY = rfdate[4:]
+        rf_dates = '/'.join(f"{int(year)}{DOY}" for year in rfyears)
+    else:
+        rf_dates = '/'.join(f"{date}" for date in rfdate) 
+    return rf_dates
+ 
+
+def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour):
     # check variable name. Is the variable name one of the abbreviations?
     argument_check.check_requested_variable(variable)
     # is it a sfc or pressure level field. # output sfc or level type
@@ -187,13 +394,12 @@ def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,p
     # if leadtime_hour = None, get leadtime_hour (output all hours).
     if leadtime_hour is None:
         leadtime_hour = output_leadtime_hour(variable,origin_id) # the function outputs an array of hours. This is the leadtime used during download.
+    else:
+        leadtime_hour = np.array(leadtime_hour) # make leadtime hour an array
     print (f"For the following variable '{variable}' using the following leadtimes '{leadtime_hour}'.")
 
-    # get lagged ensemble details
-    if fc_enslags is None:
-        fc_enslags = output_fc_lags(origin_id,fcdate)
-    # after gathering fc_enslags, check all ensemble lags are negative or zero and whole numbers as they can be user-inputted.
-    argument_check.check_fc_enslags(fc_enslags)
+    # check leadtime_hours (as individuals can choose own leadtime_hours).
+    argument_check.check_leadtime_hours(leadtime_hour,variable,origin_id)
 
     # check fcdate.
     argument_check.check_fcdate(fcdate,origin_id)
@@ -201,13 +407,23 @@ def check_and_output_all_arguments(variable,model,fcdate,area,data_format,grid,p
     # check dataformat
     argument_check.check_dataformat(data_format)
 
-    # check leadtime_hours (as individuals can choose own leadtime_hours).
-    argument_check.check_leadtime_hours(leadtime_hour,variable,origin_id)
-
     # check area selection
     argument_check.check_area_selection(area)
 
-    return level_type, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour, fc_enslags
+    return level_type, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour
 
+def check_and_output_all_hc_arguments(variable,origin_id,hcdate,rfyears=None):
+    ''' Function that will output all the necessary arguments to download reforecast data
+    '''
+    # get the date of the reforecast model
+    rf_model_date = get_hindcast_model_date(origin_id,hcdate)
+
+    # get the reforecast years
+    if rfyears is None:
+        rfyears = get_hindcast_year_span(origin_id,hcdate)
+    # after computing reforecast years, check the chosen set
+    argument_check.check_requested_reforecast_years(rfyears,origin_id,hcdate)
+
+    return rf_model_date, rfyears
 
 

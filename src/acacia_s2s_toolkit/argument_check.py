@@ -171,3 +171,14 @@ def check_fc_enslags(fc_enslags):
     if not all(isinstance(lag, int) and lag <= 0 for lag in fc_enslags):
         raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
 
+def check_requested_reforecast_years(rf_years,origin_id,fc_date):
+    ''' 
+    Check that the requested reforecast years are able to download
+    '''
+    # first get full set of reforecast years
+    full_rf_years = argument_output.get_hindcast_year_span(origin_id,fc_date)
+   
+    # check all years in rf_years are in full_rf_years
+    if not all(year in full_rf_years for year in rf_years):
+        raise ValueError(f"All requested reforecast years {rf_years} are not avaliable. Avaliable years are {full_rf_years}.")
+
