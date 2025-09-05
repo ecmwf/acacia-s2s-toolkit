@@ -7,14 +7,7 @@ def download_forecast(variable,model,fcdate,local_destination=None,filename=None
     From variable - script will work out whether sfc or pressure level and ecds varname. If necessary will also compute leadtime_hour. 
 
     '''
-    leveltype, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour = argument_output.check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour)
-
-    # get fc_enslags
-    # get lagged ensemble details
-    if fc_enslags is None:
-        fc_enslags = argument_output.output_fc_lags(origin_id,fcdate)
-    # after gathering fc_enslags, check all ensemble lags are negative or zero and whole numbers as they can be user-inputted.
-    argument_check.check_fc_enslags(fc_enslags)
+    leveltype, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour, fc_enslags = argument_output.check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags)
 
     if filename == None:
         filename = f'{variable}_{model}_{fcdate}_fc'

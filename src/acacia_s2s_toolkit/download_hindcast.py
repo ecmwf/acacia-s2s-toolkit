@@ -8,7 +8,7 @@ def download_hindcast(variable,model,fcdate,local_destination=None,filename=None
 
     '''
     # get parameters used in forecast and reforecasts
-    leveltype, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour = argument_output.check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour)
+    leveltype, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour, fc_enslags = argument_output.check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags=0)
 
     # get reforecast lags.
     # from fcdate, work out what the reforecast lags should be.

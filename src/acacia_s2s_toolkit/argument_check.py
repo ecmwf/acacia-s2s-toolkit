@@ -1,5 +1,5 @@
 # Check that requested variables are appropriate and are compatiable with WMO lead centre.
-from acacia_s2s_toolkit.variable_dict import s2s_variables, model_origin, origin_latency_hours, fc_weekday_initials
+from acacia_s2s_toolkit.variable_dict import s2s_variables
 from difflib import get_close_matches
 from datetime import datetime, timedelta
 from acacia_s2s_toolkit import argument_output
@@ -27,9 +27,10 @@ def check_requested_variable(variable):
             f"Invalid variable: '{variable}' is not in the S2S database.{suggestion_msg}"
         )
 
-def check_model_name(model):
+def check_model_name(model,fcdate):
     # Flatten all models from nested dictionary
-    all_models = list(model_origin.keys())
+    df = argument_output.read_lookup_table(fcdate)
+    all_models = list(df['Model'].values)
 
     if model in all_models:
         return True  # Variable is valid
@@ -48,13 +49,13 @@ def check_fcdate(fcdate,origin_id):
     Returns a datetime.date object if valid, or raises an error if invalid.
     """
     if not isinstance(fcdate, str):
-        print(f"[ERROR] Forecast date must be a string, got {type(fcdate)}.")
+        raise ValueError(f"[ERROR] Forecast date must be a string, got {type(fcdate)}.")
         return None
 
     try:
         date_obj = datetime.strptime(fcdate, '%Y%m%d')
     except ValueError:
-        print(f"[ERROR] '{fcdate}' is not in the correct format 'YYYYMMDD'.")
+        raise ValueError(f"[ERROR] '{fcdate}' is not in the correct format 'YYYYMMDD'.")
         return None
 
     # given originID check requested fcdate is permitted
@@ -65,14 +66,7 @@ def check_fcdate(fcdate,origin_id):
 
     # using origin name and origin_latency_hours dictionary, check time_diff is larger than numbers of hours.
     # get latency period
-    min_numhours = None
-    for originID, numhours in origin_latency_hours.items():
-        if originID == origin_id:
-            min_numhours = numhours
-            break
-    
-    if min_numhours is None:
-        print (f"[ERROR] No originID found for '{origin_id}'.")
+    min_numhours = argument_output.get_single_parameter(origin_id,fcdate,'Delay')
 
     # check min_numhours is smaller than time_diff. for instant, you cannot request an ECMWF forecast after 24 hours. 
     if time_diff < timedelta(hours=float(min_numhours)):
@@ -80,14 +74,7 @@ def check_fcdate(fcdate,origin_id):
 
     # check that requested forecast date, matches avaliable forecast initilisations
     # get weekday forecast initialisations
-    weekdays_aval = None
-    for originID, wkdays in fc_weekday_initials.items():
-        if originID == origin_id:
-            weekdays_aval = wkdays
-            break
-
-    if weekdays_aval is None:
-        print (f"[ERROR] No originID found for '{origin_id}'.")
+    weekdays_aval = argument_output.get_single_parameter(origin_id,fcdate,'fcFreq')
 
     # check that the forecast date weekday is avaliable for that model
     fcdate_weekday = date_obj.weekday()+1 # Monday = 1 etc..
@@ -98,9 +85,9 @@ def check_dataformat(data_format):
     if data_format not in ['grib','netcdf']:
         raise ValueError(f"[ERROR] The chosen data format is not avaliable. Please use 'grib' or 'netcdf'")
 
-def check_leadtime_hours(leadtime_hour,variable,origin_id):
+def check_leadtime_hours(leadtime_hour,variable,origin_id,fcdate):
     # is the maximum lead time smaller or equal to forecat end time
-    end_time = argument_output.get_endtime(origin_id)
+    end_time = argument_output.get_single_parameter(origin_id,fcdate,'fcLength')
 
     if np.max(leadtime_hour) > end_time:
         raise ValueError(f"[ERROR] You are requesting a leadtime greater than end of forecast, {end_time} hours")
@@ -168,8 +155,13 @@ def check_fc_enslags(fc_enslags):
     Check that all values in fc_enslags are non-positive integers (i.e., ≤ 0 and whole numbers).
     Raises ValueError if check fails.
     """
-    if not all(isinstance(lag, int) and lag <= 0 for lag in fc_enslags):
-        raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
+
+    if np.size(fc_enslags) == 1:
+        if not (isinstance(fc_enslags, int) and fc_enslags <= 0):
+            raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
+    else:
+        if not all(isinstance(lag, int) and lag <= 0 for lag in fc_enslags):
+            raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
 
 def check_requested_reforecast_years(rf_years,origin_id,fc_date):
     ''' 
@@ -181,4 +173,3 @@ def check_requested_reforecast_years(rf_years,origin_id,fc_date):
     # check all years in rf_years are in full_rf_years
     if not all(year in full_rf_years for year in rf_years):
         raise ValueError(f"All requested reforecast years {rf_years} are not avaliable. Avaliable years are {full_rf_years}.")
-

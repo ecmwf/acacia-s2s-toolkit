@@ -4,7 +4,7 @@ authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
   {name="Steve Woolnough", email="s.j.woolnough@reading.ac.uk" },
 ]
-version = "0.4.4.5"
+version = "1.1.0"
 description = "A python package to support download and analysis of forecasts from WMO sub-seasonal lead centre."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -33,4 +33,10 @@ Homepage = "https://github.com/joshuatalib/acacia_s2s_toolkit"
 [build-system]
 requires = ["setuptools","wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-data = { "acacia_s2s_toolkit.lookup_tables" = ["*.csv"] }
+
+
+
 
