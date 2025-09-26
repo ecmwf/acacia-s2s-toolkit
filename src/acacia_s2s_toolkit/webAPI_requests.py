@@ -36,6 +36,7 @@ def create_initial_webAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes
 def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,fc_enslags):
     # to enable lagged ensemble, loop through requested ensembles
     for lag in np.atleast_1d(fc_enslags):
+        lag = int(lag)
         leadtimes, convert_fcdate = argument_output.output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin,lag=lag,fc_enslags=fc_enslags) # you need to know new fcdate, but also appropriate leadtimes so all are forecasting same period
         # create initial control request
         request_dict = create_initial_webAPI_request(convert_fcdate,grid,area,origin,webapi_param,leadtimes,f'{filename}_control_{lag}')
@@ -88,7 +89,8 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
 def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,rf_enslags,rf_years):
     # to enable lagged ensemble, loop through requested ensembles
     print (rf_enslags)
-    for lag in rf_enslags:
+    for lag in np.atleast_1d(rf_enslags):
+        lag = int(lag)
         # convert fcdate
         lagged_fcdate = datetime.strptime(fcdate, '%Y%m%d')+timedelta(days=lag) # work out what the lagged fcdate is.
         convert_fcdate = lagged_fcdate.strftime('%Y%m%d') # convert that date to YYYYMMDD format

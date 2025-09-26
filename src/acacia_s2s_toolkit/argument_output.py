@@ -85,8 +85,6 @@ def output_leadtime_hour(variable,origin_id,fcdate,fc_enslags,start_time=0):
     else:
         leadtime_hour = np.arange(start_time,end_time+1,24) # will output 0 to 1104 in steps of 24 (ECMWF example). 
  
-    print (f"For the following variable '{variable}' using the following leadtimes '{leadtime_hour}'.")
-
     # take the minimum value in fc_enslags and multiply by 24
     max_endtime = end_time+(24*np.min(fc_enslags)) # so 1104 + (24*-2) = 1056
     leadtime_hour = leadtime_hour[leadtime_hour <= max_endtime]
@@ -335,6 +333,8 @@ def get_hindcast_year_span(origin_id,fcdate):
     return rf_years
 
 def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_enslags=0):
+    ''' lag is always negative for forecast. Function always uses lag=0 for reforecast download'''
+    
     # create new fcdate based on lag
     new_fcdate = datetime.strptime(fcdate, '%Y%m%d')+timedelta(days=float(lag))
     convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
@@ -348,29 +348,35 @@ def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_
     # convert leadtimes
     # is it an average field?
     time_resolution = get_timeresolution(variable)
+
+    # get standard, all leadtime hours avaliable
+    leadtime_hour_ALL = output_leadtime_hour(variable,origin_id,fcdate,fc_enslags)
+
+    # find the indexes of the requested leadtimes (leadtime_hour)
+    idx = np.asarray([np.where(leadtime_hour_ALL == lt)[0][0] for lt in leadtime_hour]) # get the indexes of where the requested leadtime hours are
+
     # if an average field, use '0-24/24-48/48-72...'
     leadtime_hour_copy = leadtime_hour[:]
 
-    # need to ensure correct selection of lead time given lag. Essentially all members should sample same forecast period.
-    # this is done for forecast not REFORECAST
-    max_lag = np.abs(np.min(fc_enslags))
-    lag_minus_1 = lag*-1
-    lag_end = (max_lag-lag_minus_1)*-1
-
     if time_resolution.startswith('aver'):
-        if lag_end == 0:
-            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1:]
-        else:
-            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1:lag_end]
-        leadtimes='/'.join(f"{leadtime_hour_copy[i]}-{leadtime_hour_copy[i]+24}" for i in range(len(leadtime_hour_copy)-1))
+        new_idx = idx-lag
     else: # instantaneous field
         nsteps_per_day = 4
-        if lag_end == 0:
-            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1*nsteps_per_day:]
-        else:
-            leadtime_hour_copy=leadtime_hour_copy[lag_minus_1*nsteps_per_day:lag_end*nsteps_per_day]
+        new_idx = idx-lag*nsteps_per_day
+
+    # check index is no larger than forecast length
+    if np.max(new_idx) > len(leadtime_hour_ALL):
+        raise ValueError(f"[ERROR] The maximum requested leadtime hour is greater than the forecast length, i.e. when performing lagged forecast ensemble, it can reach the last few timesteps.")
+
+    leadtime_hour_copy=leadtime_hour_ALL[new_idx]
+
+    if time_resolution.startswith('aver'):
+        leadtimes='/'.join(f"{leadtime_hour_copy[i]}-{leadtime_hour_copy[i]+24}" for i in range(len(leadtime_hour_copy)-1))
+    else: # instantaneous field
         leadtimes = '/'.join(str(x) for x in leadtime_hour_copy)
+    
     print (leadtimes)
+    
     return leadtimes, convert_fcdate
 
 def create_reforecast_dates(rfyears,rfdate):

@@ -2,10 +2,10 @@
 name = "acacia_s2s_toolkit"
 authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
-  {name="Steve Woolnough", email="s.j.woolnough@reading.ac.uk" },
+  {name="Innocent Masukwedza", email="g.t.masukwedza@reading.ac.uk"},
 ]
-version = "1.1.0"
-description = "A python package to support download and analysis of forecasts from WMO sub-seasonal lead centre."
+version = "1.2"
+description = "A python package to support download and analysis of forecasts from ECMWF S2S Database."
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [

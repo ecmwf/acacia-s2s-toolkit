@@ -1,0 +1,2 @@
+recursive-include src/acacia_s2s_toolkit/lookup_tables *.csv
+

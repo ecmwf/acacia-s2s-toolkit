@@ -1,6 +1,7 @@
 # scripts relevant for merging multiple forecast
 import xarray as xr
 import numpy as np
+import pandas as pd
 
 def merge_all_ens_members(filename,leveltype):
     # open all ensemble members. drop step and time variables. Just use valid time.
@@ -24,6 +25,16 @@ def merge_all_ens_members(filename,leveltype):
             single_mem_sel = single_mem.sel(step=nan_mask)
             single_mem_sel = single_mem_sel.swap_dims({"step":"valid_time"})
             single_mem_sel = single_mem_sel.drop_vars(['step','time'])
+            # check for duplicate time points (common for accumulations)
+            # SORT FOR LAGGED ENSEMBLE (NCEP for instance)
+            if len(single_mem_sel['valid_time'].values) != len(pd.unique(single_mem_sel['valid_time'].values)):
+                # There are duplicates → merge them along 'number'
+                unique_times = pd.unique(single_mem_sel['valid_time'].values)
+
+                slices = [single_mem_sel.sel(valid_time=t).stack(member=("number","valid_time")).reset_index("member", drop=True).assign_coords(valid_time=t) for t in unique_times]
+                single_mem_sel = xr.concat(slices, dim='valid_time')
+                single_mem_sel = single_mem_sel.rename({'member':'number'})
+
             all_data.append(single_mem_sel)
         all_fcs = xr.concat(all_data,dim='fc_init_member')
 
@@ -39,10 +50,16 @@ def merge_all_ens_members(filename,leveltype):
         pass
 
     if leveltype == 'pressure':
-        combined = combined.rename({'isobaricInhPa':'level'})
-        combined = combined.transpose('time','member','level','latitude','longitude')
+        if 'isobaricInhPa' in combined.dims:
+            combined = combined.rename({'isobaricInhPa':'level'})
+        # Only transpose dims that actually exist
+        combined = combined.transpose(
+            *[d for d in ['time','member','level','latitude','longitude'] if d in combined.dims]
+        )
     else:
-        combined = combined.transpose('time','member','latitude','longitude')
+        combined = combined.transpose(
+            *[d for d in ['time','member','latitude','longitude'] if d in combined.dims]
+        )
 
     return combined
 
@@ -55,11 +72,17 @@ def merge_all_ens_hindcasts(filename,leveltype):
     combined = all_fcs.stack(member=("fc_init_member", "number")).reset_index("member", drop=True)
 
     if leveltype == 'pressure':
-        combined = combined.rename({'isobaricInhPa':'level'})
-        combined = combined.transpose('time','member','level','latitude','longitude')
+        if 'isobaricInhPa' in combined.dims:
+            combined = combined.rename({'isobaricInhPa':'level'})
+        # Only transpose dims that actually exist
+        combined = combined.transpose(
+            *[d for d in ['time','member','level','latitude','longitude'] if d in combined.dims]
+        )
     else:
         print (combined)
-        combined = combined.transpose('time','member','latitude','longitude')
+        combined = combined.transpose(
+            *[d for d in ['time','member','latitude','longitude'] if d in combined.dims]
+        )
 
     return combined
 
