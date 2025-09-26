@@ -29,6 +29,7 @@ def merge_all_ens_members(filename,leveltype):
             # SORT FOR LAGGED ENSEMBLE (NCEP for instance)
             if len(single_mem_sel['valid_time'].values) != len(pd.unique(single_mem_sel['valid_time'].values)):
                 # There are duplicates → merge them along 'number'
+                print ('Please note. There are still multiple values of the same time after merging valid_time (most likely due to an accumulation field that takes into consideration forecast step). To manually fix, we put all forecasts with the same timestamp in the same ensemble set. Further investigation needed to understand effect but for accumulation, you will most likely subtract from another time stamp')
                 unique_times = pd.unique(single_mem_sel['valid_time'].values)
 
                 slices = [single_mem_sel.sel(valid_time=t).stack(member=("number","valid_time")).reset_index("member", drop=True).assign_coords(valid_time=t) for t in unique_times]
