@@ -4,7 +4,7 @@ authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
   {name="Innocent Masukwedza", email="g.t.masukwedza@reading.ac.uk"},
 ]
-version = "1.2"
+version = "1.4"
 description = "A python package to support download and analysis of forecasts from ECMWF S2S Database."
 readme = "README.md"
 requires-python = ">=3.8"

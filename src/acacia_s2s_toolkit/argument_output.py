@@ -86,8 +86,8 @@ def output_leadtime_hour(variable,origin_id,fcdate,fc_enslags,start_time=0):
         leadtime_hour = np.arange(start_time,end_time+1,24) # will output 0 to 1104 in steps of 24 (ECMWF example). 
  
     # take the minimum value in fc_enslags and multiply by 24
-    max_endtime = end_time+(24*np.min(fc_enslags)) # so 1104 + (24*-2) = 1056
-    leadtime_hour = leadtime_hour[leadtime_hour <= max_endtime]
+    #max_endtime = end_time+(24*np.min(fc_enslags)) # so 1104 + (24*-2) = 1056
+    #leadtime_hour = leadtime_hour[leadtime_hour <= max_endtime]
 
     return leadtime_hour
 
@@ -334,7 +334,9 @@ def get_hindcast_year_span(origin_id,fcdate):
 
 def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_enslags=0):
     ''' lag is always negative for forecast. Function always uses lag=0 for reforecast download'''
-    
+
+    print (fc_enslags)
+
     # create new fcdate based on lag
     new_fcdate = datetime.strptime(fcdate, '%Y%m%d')+timedelta(days=float(lag))
     convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
@@ -358,11 +360,11 @@ def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_
     # if an average field, use '0-24/24-48/48-72...'
     leadtime_hour_copy = leadtime_hour[:]
 
-    if time_resolution.startswith('aver'):
-        new_idx = idx-lag
-    else: # instantaneous field
+    if time_resolution.endswith('6hrly'):
         nsteps_per_day = 4
         new_idx = idx-lag*nsteps_per_day
+    else: # instantaneous field
+        new_idx = idx-lag
 
     # check index is no larger than forecast length
     if np.max(new_idx) > len(leadtime_hour_ALL):

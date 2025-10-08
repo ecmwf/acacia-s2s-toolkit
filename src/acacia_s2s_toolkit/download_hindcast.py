@@ -105,7 +105,8 @@ def download_hindcast(model,
     print(f"   Save Dir    : {data_save_dir}")
     print(f"   Filename    : {filename}")
 
-    rf_enslags = argument_output.output_hc_lags(origin_id, fcdate)
+    if rf_enslags == None:
+        rf_enslags = argument_output.output_hc_lags(origin_id, fcdate)
     rf_model_date, rf_years = argument_output.check_and_output_all_hc_arguments(variable, origin_id, fcdate, rf_years)
 
     # Filename construction
