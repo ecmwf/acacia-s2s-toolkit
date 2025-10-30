@@ -2,12 +2,21 @@
 
 # -- Project information
 
-project = 'Lumache'
-copyright = '2021, Graziella'
-author = 'Graziella'
+# Configuration file for the Sphinx documentation builder.
 
-release = '0.1'
-version = '0.1.0'
+import tomllib  # Use 'import tomllib' if using Python 3.11+
+from pathlib import Path
+import sphinx_rtd_theme
+import os
+
+# -- Project information
+
+project = 'AI_Weather_Quest'
+copyright = '2025, Joshua Talib + AI Weather Quest contributors'
+author = 'Joshua Talib'
+
+release = '1.0'
+version = '1.1.4'
 
 # -- General configuration
 
@@ -30,6 +39,7 @@ templates_path = ['_templates']
 # -- Options for HTML output
 
 html_theme = 'sphinx_rtd_theme'
+html_logo = os.path.abspath("acacia_logo.png")
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
