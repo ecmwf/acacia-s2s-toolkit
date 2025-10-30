@@ -1,9 +1,5 @@
 # Configuration file for the Sphinx documentation builder.
 
-# -- Project information
-
-# Configuration file for the Sphinx documentation builder.
-
 import tomllib  # Use 'import tomllib' if using Python 3.11+
 from pathlib import Path
 import sphinx_rtd_theme
