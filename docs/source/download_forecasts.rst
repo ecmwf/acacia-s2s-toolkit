@@ -71,6 +71,10 @@ After this, use `download_forecast` to download operational forecasts:
 :Returns:
   Path to the downloaded file as a string.
 
+Examples
+------------
+
+
 Explanations of certain options
 -------------
 
@@ -85,7 +89,7 @@ The ``fc_enslags`` option allows the user to download a **lagged forecast ensemb
 - Creating a lagged ensemble will only work if a forecast was initialised on the requested lagged date.
 
 Example 1: Single forecast initialisation
------------------------------------------
+^^^^^^^^^^^
 
 Suppose you want to request a JMA forecast of accumulated precipitation on **6th November 2025**. You can set ``fc_enslags=[0]``:
 
@@ -96,7 +100,7 @@ Suppose you want to request a JMA forecast of accumulated precipitation on **6th
 This will download all timesteps of forecasted precipitation from the forecast run initialised on 6th November 2025. Since ``fc_enslags`` is set to ``0``, it only includes integrations starting on that date.
 
 Example 2: Lagged forecast ensemble
------------------------------------
+^^^^^^^^^^^^^^^^^^^
 
 If you set ``fc_enslags=[0, -1, -2]`` (the default for JMA forecasts):
 
@@ -120,7 +124,25 @@ For the lagged ensemble, the **time dimension corresponds to the forecasted peri
 leadtime_hour
 ~~~~~~~~~~~~
 
+The temporal resolution of forecast data available from ECMWF's S2S database varies depending on the selected variable. A complete list of parameters and their corresponding resolutions can be found on the `ECMWF's S2S parameter page <https://confluence.ecmwf.int/display/S2S/Parameters>`_. In general, data is provided at either six-hourly or daily intervals, and may represent instantaneous, averaged, or accumulated values. 
 
-Examples
-------------
+The Python-based dictionary called ``s2s_variables`` in `variable_dict.py <https://github.com/joshuatalib/acacia_s2s_toolkit/blob/main/src/acacia_s2s_toolkit/variable_dict.py>`_ provides an overview of all avaliable parameters and their associated temporal resolutions.
+
+When downloading a variable, the default behaviour is to retrieve all available lead times. For example,
+
+.. code-block:: python
+
+   download_forecast('ECMWF', 'tp', fcdate='20251106')
+
+This command downloads accumulated preciptation (``'tp'``) up to 46 days ahead at a six-hourly resolution. As total precipitation (``'tp'``) is an accumulated field, downloading all lead times is often unnecessry. Instead, you can specify a subset of lead times to obtain accumulated precipitation at a weekly resolution for the first four weeks:
+
+.. code-block:: python
+
+   download_forecast('ECMWF', 'tp', fcdate='20251106',leadtime_hour=[168,336,504,672])
+
+This download will include data at four timestamps, each representing the end of a week. 
+
+.. important::
+
+   When working with accumulated variables in a lagged ensemble environment, take care when specifying lead times. The current configuration shifts leadtime_hour according to the lagged_ensemble offset, which may cause discrepancies in accumulated values. For example, using fc_enslag=-1 with leadtime_hour=168 will shift the lead time to 192 hours, effectively adding an extra day of precipitation. To avoid this, compute the difference between two lead times.
 
