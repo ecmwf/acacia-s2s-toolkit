@@ -12,8 +12,7 @@ You can then install the package using ``pip``:
 
 .. code-block:: console
 
-   (.venv) $ pip install acacia_s2s_toolkit
-
+   pip install acacia_s2s_toolkit
 
 Necessary requirements
 ------------
@@ -32,7 +31,7 @@ Once your ECMWF webAPI credentials are saved, install the ECMWF client library u
 
 .. code-block:: console
 
-   (.venv) $ pip install ecmwf-api-client
+   pip install ecmwf-api-client
 
 This package provides the necessary client functions for accessing ECMWF data.
 

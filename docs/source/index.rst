@@ -9,9 +9,14 @@ The python wrapper pulls data from ECMWF's `S2S Open Database <https://confluenc
 
    This project is under active development.
 
+.. important::
+
+   This python wrapper is originally designed with operational forecasters in mind. Please be careful with using the python wrapper for forecast evaluation as certain timestamps may be invalid for your purpose.
+
 Contents
 --------
 
 .. toctree::
 
    Installation
+   download_forecasts
