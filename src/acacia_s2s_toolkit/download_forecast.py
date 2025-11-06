@@ -115,14 +115,14 @@ def download_forecast(model,
                 plev_str = f"_{plevs[0]}-{plevs[-1]}hPa"
 
         if location_name:
-            filename = f"{variable}_{model}_{fcdate}{plev_str}_{location_name}_hc"
+            filename = f"{variable}_{model}_{fcdate}{plev_str}_{location_name}_fc"
         else:
             north, west, south, east = bbox_bounds
             bounds_str = (
                 f"{format_coord(north, lat=True)}_{format_coord(west, lat=False)}_"
                 f"{format_coord(south, lat=True)}_{format_coord(east, lat=False)}"
             )
-            filename = f"{variable}_{model}_{fcdate}{plev_str}_{bounds_str}_hc"
+            filename = f"{variable}_{model}_{fcdate}{plev_str}_{bounds_str}_fc"
 
     # Add extension
     filename_save = filename  # reassign var name as ther are intermediate file names saved
