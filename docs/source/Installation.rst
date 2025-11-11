@@ -41,9 +41,10 @@ This package provides the necessary client functions for accessing ECMWF data.
 Quick checklist
 ~~~~~~~~~~~~~~~~~~~~~~
 Before attempting to download sub-seasonal forecast data using this python tool, please ensure you have performed the following steps:
-1) `Python 3 <https://www.python.org/downloads/>`_ is installed
-2) The Python packages **acacia_s2s_toolkit** and **ecmwf-api-client** are installed. 
-3) Your ECMWF webAPI credentials are saved in ``~/.ecmwfapirc`` on your working environment.
+1. `Python 3 <https://www.python.org/downloads/>`_ is installed
+2. The Python packages **acacia_s2s_toolkit** and **ecmwf-api-client** are installed. 
+3. Your ECMWF webAPI credentials are saved in ``~/.ecmwfapirc`` on your working environment.
+
 
 Further information
 ------------
