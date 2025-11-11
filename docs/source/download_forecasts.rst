@@ -4,7 +4,7 @@ Downloading operational forecasts
 .. important::
     This is a tool being developed by the ACACIA project. Please email feedback to joshua.talib@ecmwf.int.
 
-Main function description
+Download a forecast
 -----------
 
 To download a forecast from ECMWF's S2S database, you will need to use the `download_forecast` function from the `download_forecast.py` python module. To begin with, it is recommended that you download ECMWF forecast data first to get used to the system. 
@@ -74,8 +74,13 @@ After this, use `download_forecast` to download operational forecasts:
 :Returns:
   Path to the downloaded file as a string.
 
+.. note::
+
+    For simplicity, all ensemble members are downloaded in a single request. Currently, the control and perturbed forecasts are concatenated into one file after download.
+
 Examples
 ------------
+To be developed.
 
 
 Explanations of certain options
