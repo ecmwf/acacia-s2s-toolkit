@@ -78,6 +78,8 @@ After this, use `download_forecast` to download operational forecasts:
 
     For simplicity, all ensemble members are downloaded in a single request. Currently, the control and perturbed forecasts are concatenated into one file after download.
 
+You can check the status of your webAPI downloads on the following `page <https://apps.ecmwf.int/webmars/joblist/>`_ . 
+
 Examples
 ------------
 To be developed.
