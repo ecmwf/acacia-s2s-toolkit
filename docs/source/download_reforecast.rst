@@ -31,38 +31,13 @@ Currently a separate download request is required for each variable.
 
 :Optional parameters:
 
-- **fcdate** (*str*, optional): Forecast initialisation date in ``YYYYMMDD`` format. If no date is given, then the latest avaliable reforecast is downloaded.
+Parameters including **fcdate**, **plevs**, **location_name**, **bbox_bounds**, **filename**, **data_save_dir**, **data_format**, **grid**, **leadtime_hour**, **overwrite** and **verbose** are described in the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. Additional parameters unique to downloading a set of reforecasts include:
 
-- **plevs** (*int or list of int*, optional): Pressure levels in hPa for pressure-level variables. Avaliable levels include 1000, 925, 850, 700, 500, 300, 200, 100, 50 and 10 hPa.  
+- **rf_years** (*list of int*, optional): A list of years, i.e. [2000, 2001, 2002], to download reforecasts. 
 
-- **location_name** (*str*, optional): Predefined geographic region. Overrides ``bbox_bounds`` if provided. Current supported values include:
-  
-  - ``"ethiopia"``
-  - ``"kenya"``
-  - ``"madagascar"``
-  - ``"eastafrica"``
-
-- **bbox_bounds** (*list of float*, optional, default ``[90, -180, -90, 180]``): Geographic bounding box in the order ``[north, west, south, east]`` (degrees latitude/longitude). Overridden if ``location_name`` is provided.
-
-- **filename** (*str*, optional): Name of the outputted file. If ``None``, filename is automatically constructed from variable, model, date, pressure levels, and domain. The function appends ``.nc`` or ``.grib`` depending on ``data_format``.
-
-- **data_save_dir** (*str*, optional): Directory to save the downloaded file. Created if it doesn’t exist. Defaults to the current working directory if ``None``.
-
-- **data_format** (*str*, optional, default ``"netcdf"``): Output data format: ``"netcdf"`` or ``"grib"``. Current testing has focused on netCDF format.
-
-- **grid** (*str*, optional, default ``"1.5/1.5"``): Horizontal grid spacing (degrees) in ``lat/lon`` order.
-
-- **leadtime_hour** (*int or list of int*, optional): Forecast lead times in hours from initialisation. If ``None``, then all avaliable lead times for the requested forecast will be provided. Example: ``24`` for 1 day, or ``[24, 48, 72]`` for 1 to 3 days.
-
-- **rf_years** (*list of int*, optional): Need to write.
-
-- **rf_enslags** (*list of int*, optional): Need to write.
+- **rf_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model is described on the following confluence page.
 
 - **fc_time** (*bool*, default ``True``): If ``True``, overwrite existing file. If ``False``, skip download if file exists.
-
-- **overwrite** (*bool*, default ``True``): If ``True``, overwrite existing file. If ``False``, skip download if file exists.
-
-- **verbose** (*bool*, default ``True``): If ``True``, prints download info, debug messages, and rollback messages. If ``False``, suppresses output.
 
 :Returns:
   Path to the downloaded file as a string.
