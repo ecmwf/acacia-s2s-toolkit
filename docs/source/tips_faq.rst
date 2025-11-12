@@ -13,3 +13,8 @@ Tips
 
 Frequently Asked Questions 
 -----------
+
+.. dropdown:: Why can’t I view certain ECMWF Confluence pages?
+    :animate: fade-in
+
+    Due to license restrictions, public ECMWF Confluence accounts cannot view certain reference pages. To access publicly viewable pages, please log out of your ECMWF account and view them anonymously (i.e., while not logged in).
