@@ -40,6 +40,8 @@ After this, use `download_forecast` to download operational forecasts:
   - ``2t``: Surface air temperature (K)
   - ``tp``: Total precipitation (mm)
 
+Currently a download request is required for each variable. 
+
 :Optional parameters:
 
 - **fcdate** (*str*, optional): Forecast initialisation date in ``YYYYMMDD`` format. If no date is given, then the latest avaliable forecast is downloaded.
