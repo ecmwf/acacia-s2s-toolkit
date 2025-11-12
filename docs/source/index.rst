@@ -20,3 +20,4 @@ Contents
 
    Installation
    download_forecasts
+   tips_faq
