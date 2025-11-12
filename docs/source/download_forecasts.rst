@@ -67,7 +67,7 @@ Currently a download request is required for each variable.
 
 - **leadtime_hour** (*int or list of int*, optional): Forecast lead times in hours from initialisation. If ``None``, then all avaliable lead times for the requested forecast will be provided. Example: ``24`` for 1 day, or ``[24, 48, 72]`` for 1 to 3 days.
 
-- **fc_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model is described on the following `confluence page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_ confluence page.
+- **fc_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model is described on the following `confluence page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_.
 
 - **overwrite** (*bool*, default ``False``): If ``True``, overwrite existing file. If ``False``, skip download if file exists.
 
