@@ -26,7 +26,7 @@ To upgrade to the latest version, run:
    python3 -m pip install --upgrade acacia_s2s_toolkit
 
 .. note::
-    This is a tool being developed by the ACACIA project. Package updates are recommended due to continuous developments. 
+    This tool is being developed by the ACACIA project. Regular package updates are recommended due to continuous developments. 
 
 Necessary requirements
 ------------
