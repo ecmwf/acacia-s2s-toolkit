@@ -17,6 +17,17 @@ You can then install the package using ``pip``:
 
    pip install acacia_s2s_toolkit
 
+Upgrading the Package
+----------------------
+To upgrade to the latest version, run:
+
+.. code-block:: bash
+
+   python3 -m pip install --upgrade acacia_s2s_toolkit
+
+.. note::
+    This is a tool being developed by the ACACIA project. Package updates are recommended due to continuous developments. 
+
 Necessary requirements
 ------------
 
