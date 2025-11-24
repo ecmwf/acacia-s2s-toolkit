@@ -23,7 +23,7 @@ After this, use `download_forecast` to download operational forecasts:
 
 :Necessary parameters:
 
-- **model** (*str*): The forecasting model. Supported models (as of 6th November 2025):
+- **model** (*str*): The forecasting model. A full summary of models including their forecast frequency and data access delay can be found on the following `confluence page <https://confluence.ecmwf.int/display/S2S/Models>`_. Supported models (as of 6th November 2025):
 
   - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts
   - ``'ECCC'``: Environment and Climate Change Canada
