@@ -54,7 +54,7 @@ This package provides the necessary client functions for accessing ECMWF data.
 
 Additional package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~
-In addition to requiring "*ecmwf-api-client*", the package has the following dependencies:
+In addition to requiring "*ecmwf-api-client*", this package depends on the following libraries:
 
 - **numpy** (version 1.23 or higher)
 - **cdo** (versions 2.4.0 or higher)
@@ -68,7 +68,10 @@ In addition to requiring "*ecmwf-api-client*", the package has the following dep
 - **matplotlib** (versions 3.8 or higher)
 - **cartopy** (versions 0.22 or higher)
 
-Given the large number of dependencies, we highly recommend using the **acacia_s2s_toolkit** in a virtual environment. 
+.. note::
+    Some dependencies, especially eccodes, cdo, and cartopy—require system-level libraries (e.g., PROJ, GEOS, ecCodes) in addition to the Python packages. Using Conda is recommended for effortless installation of both Python and non-Python components.
+
+Given the number of dependencies, we highly recommend using the **acacia_s2s_toolkit** with a dedicated virtual environment. Guidance on creating and managing environments can be found in the official documentation for both `Conda <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html>`_ and `Anaconda <https://www.anaconda.com/docs/getting-started/working-with-conda/environments>`_. 
 
 Quick checklist
 ~~~~~~~~~~~~~~~~~~~~~~
