@@ -52,6 +52,24 @@ This package provides the necessary client functions for accessing ECMWF data.
 .. important::
     Access to data stored on ECMWF's S2S database will be changing from webAPI to cdsAPI. The new system relies on retrieval scripts compatible with the Climate Data Store (CDS). This package will be updated to support the new system after the transition is complete.
 
+Additional package dependencies
+~~~~~~~~~~~~~~~~~~~~~~
+In addition to requiring "*ecmwf-api-client*", the package has the following dependencies:
+
+- **numpy** (version 1.23 or higher)
+- **cdo** (versions 2.4.0 or higher)
+- **xarray** (version 2024.09.0 or higher)
+- **eccodes** (version 2.40.0 or higher)
+- **dask** (version 2024.9.0)
+- **pandas** (version 2.2.3 or higher)
+- **scipy** (version 1.14.1 or higher)
+- **netCDF4** (version 1.7.2 or higher)
+- **requests** (versions 2.32.2 or higher)
+- **matplotlib** (versions 3.8 or higher)
+- **cartopy** (versions 0.22 or higher)
+
+Given the large number of dependencies, we highly recommend using the **acacia_s2s_toolkit** in a virtual environment. 
+
 Quick checklist
 ~~~~~~~~~~~~~~~~~~~~~~
 Before attempting to download sub-seasonal forecast data using this python tool, please ensure you have performed the following steps:
