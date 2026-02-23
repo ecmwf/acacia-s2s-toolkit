@@ -20,3 +20,5 @@ Contents
 
    Installation
    download_forecasts
+   download_reforecast
+   tips_faq

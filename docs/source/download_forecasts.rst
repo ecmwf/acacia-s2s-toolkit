@@ -1,7 +1,10 @@
 Downloading operational forecasts
 =====
 
-Main function description
+.. important::
+    This is a tool being developed by the ACACIA project. Please email feedback to joshua.talib@ecmwf.int.
+
+Download a forecast
 -----------
 
 To download a forecast from ECMWF's S2S database, you will need to use the `download_forecast` function from the `download_forecast.py` python module. To begin with, it is recommended that you download ECMWF forecast data first to get used to the system. 
@@ -20,7 +23,7 @@ After this, use `download_forecast` to download operational forecasts:
 
 :Necessary parameters:
 
-- **model** (*str*): The forecasting model. Supported models (as of 6th November 2025):
+- **model** (*str*): The forecasting model. A full summary of models including their forecast frequency and data access delay can be found on the following `confluence page <https://confluence.ecmwf.int/display/S2S/Models>`_. Supported models (as of 6th November 2025) include:
 
   - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts
   - ``'ECCC'``: Environment and Climate Change Canada
@@ -36,6 +39,8 @@ After this, use `download_forecast` to download operational forecasts:
   - ``10v``: 10 metre v-velocity (:math:`\mathrm{m \, s^{-1}}`)
   - ``2t``: Surface air temperature (K)
   - ``tp``: Total precipitation (mm)
+
+Currently a download request is required for each variable. 
 
 :Optional parameters:
 
@@ -62,7 +67,7 @@ After this, use `download_forecast` to download operational forecasts:
 
 - **leadtime_hour** (*int or list of int*, optional): Forecast lead times in hours from initialisation. If ``None``, then all avaliable lead times for the requested forecast will be provided. Example: ``24`` for 1 day, or ``[24, 48, 72]`` for 1 to 3 days.
 
-- **fc_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model is described on the following `confluence page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_ confluence page.
+- **fc_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model is described on the following `confluence page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_.
 
 - **overwrite** (*bool*, default ``False``): If ``True``, overwrite existing file. If ``False``, skip download if file exists.
 
@@ -71,8 +76,15 @@ After this, use `download_forecast` to download operational forecasts:
 :Returns:
   Path to the downloaded file as a string.
 
+.. note::
+
+    For simplicity, all ensemble members are downloaded in a single request. Currently, the control and perturbed forecasts are concatenated into one file after download.
+
+You can check the status of your webAPI downloads on the following `page <https://apps.ecmwf.int/webmars/joblist/>`_ . 
+
 Examples
 ------------
+To be developed.
 
 
 Explanations of certain options
