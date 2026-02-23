@@ -156,9 +156,12 @@ def check_fc_enslags(fc_enslags):
     Raises ValueError if check fails.
     """
 
-    if np.size(fc_enslags) == 1:
-        if not (isinstance(fc_enslags, int) and fc_enslags <= 0):
+    # Case 1: a single integer
+    if isinstance(fc_enslags, int):
+        if fc_enslags > 0:
             raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")
+
+    # Case 2: iterable of integers, a list
     else:
         if not all(isinstance(lag, int) and lag <= 0 for lag in fc_enslags):
             raise ValueError("All ensemble lags (fc_enslags) must be integers ≤ 0 (e.g., [0, -1, -2]).")

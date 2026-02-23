@@ -34,6 +34,7 @@ def download_hindcast(model,
                          leadtime_hour=None,
                          rf_years=None,
                          rf_enslags=None,
+                         fc_time=True,
                          overwrite=False,
                          verbose=True):
 
@@ -107,7 +108,7 @@ def download_hindcast(model,
 
     if rf_enslags == None:
         rf_enslags = argument_output.output_hc_lags(origin_id, fcdate)
-    rf_model_date, rf_years = argument_output.check_and_output_all_hc_arguments(variable, origin_id, fcdate, rf_years)
+    #rf_model_date, rf_years = argument_output.check_and_output_all_hc_arguments(variable, origin_id, fcdate, rf_years)
 
     # Filename construction
     if filename is None:
@@ -160,13 +161,13 @@ def download_hindcast(model,
         if verbose:
             webAPI_requests.request_hindcast(
                 fcdate, origin_id, grid, variable, bbox_bounds, data_format, webapi_param,
-                leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years
+                leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years, fc_time
             )
         else:
             with SuppressOutput():
                 webAPI_requests.request_hindcast(
                     fcdate, origin_id, grid, variable, bbox_bounds, data_format, webapi_param,
-                    leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years
+                    leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years, fc_time
                 )
     except Exception as e:
         # Re-raise but ensure logs aren't hidden if debugging

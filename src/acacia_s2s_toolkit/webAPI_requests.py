@@ -86,7 +86,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     # remove previous files  
     os.system(f'rm {filename}_control* {filename}_perturbed* {filename}_allens*')
 
-def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,rf_enslags,rf_years):
+def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,rf_enslags,rf_years,fc_time=True):
     # to enable lagged ensemble, loop through requested ensembles
     print (rf_enslags)
     for lag in np.atleast_1d(rf_enslags):
@@ -150,7 +150,12 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # merge both control and perturbed forecast
         os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag} 2>/dev/null')
         # shift the time so all reforecasts have the same time values
-        rf_shifttime(f'{filename}_allens_{lag}',f'{filename}_timeshifted_allens_{lag}',shift_days=lag*-1)
+        if fc_time:
+            shift_day_value = lag*-1
+        else:
+            shift_day_value = 0 
+        # only shift the time, if you want a 'forecast-based' time.
+        rf_shifttime(f'{filename}_allens_{lag}',f'{filename}_timeshifted_allens_{lag}',shift_days=shift_day_value)
 
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # same process following even with one forecast initialisation date to ensure same structure for all output. 

@@ -1,0 +1,175 @@
+# script that can downloaded forecasted S2S TC tracks
+import xarray as xr
+import numpy as np
+import pandas as pd
+import ftplib
+import os
+import huracanpy as hpy
+from acacia_s2s_toolkit import argument_output
+from datetime import datetime
+
+def empty_member_dataset():
+    return xr.Dataset(
+        data_vars={
+            'track_id': ('record', np.array([], dtype='int64')),
+            'time': ('record', np.array([], dtype='datetime64[ns]')),
+            'lat': ('record', np.array([], dtype='float64')),
+            'lon': ('record', np.array([], dtype='float64')),
+            'wind': ('record', np.array([], dtype='float64')),
+            'pres': ('record', np.array([], dtype='float64')),
+            'lat_wind': ('record', np.array([], dtype='float64')),
+            'lon_wind': ('record', np.array([], dtype='float64')),
+            'basin': ('record', np.array([], dtype='U3')),
+        },
+        coords={
+            'ens_mem': ('record', np.array([], dtype='int64')),
+        }
+    )
+
+def load_fc_tracks(model,fcdate):
+    # load in data
+    session = ftplib.FTP('aux.ecmwf.int')
+    session.login(user='REMOVED_S2S_USERNAME_PASSWORD',passwd='REMOVED_S2S_USERNAME_PASSWORD')
+    session.cwd("TCYC")
+    
+    # create filepath
+    mn = model.lower().strip() # model name
+    yy = fcdate[:4] # year component
+    mm = fcdate[4:6] # month component
+    TC_fn = f"TC.{fcdate}"
+    
+    filepath = f"{mn}/real-time/{yy}/{mm}/{TC_fn}" # creates full filename
+    local_filename = TC_fn
+    
+    # retrieve the full year file
+    with open(local_filename,'wb') as f:
+        session.retrbinary(f"RETR {filepath}", f.write)
+    
+    print(f"File '{filepath}' has been downloaded.")
+    
+    session.quit()
+    return local_filename
+
+def download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags): 
+    '''
+    need to do something with leadtime_hour parameter
+    '''
+    # extract multiple ens lags
+    lag_i = 0
+    all_fcs = []
+    for lag in np.atleast_1d(sorted(fc_enslags)):
+        lag = int(lag)
+        print (lag)
+        leadtimes, convert_fcdate = argument_output.output_formatted_leadtimes(leadtime_hour,fcdate,'TC_TRACKS',origin_id,lag=lag,fc_enslags=fc_enslags)
+
+        print (leadtimes)
+
+        date_obj = datetime.strptime(convert_fcdate, "%Y-%m-%d")
+        convert_fcdate = date_obj.strftime("%Y%m%d")
+
+        fn = load_fc_tracks(model,convert_fcdate) # load in forecast TC track file from Frederic's FTP site
+        
+        # untar the file. will give all ensemble members. for ECMWF 101.
+        os.system(f'tar -xf {fn}')
+        
+        short_name = origin_id  # need to get short name. add to look-up file
+        num_ens_mems = argument_output.get_single_parameter(origin_id,convert_fcdate,'fcNumEns')+1
+        
+        # loop through all basins
+        basins = ['atl','aus','cnp','enp','nin','sin','spc','wnp']
+        
+        for num in range(num_ens_mems):
+            # untar first ens mem
+            os.system(f'tar -xf {short_name}.{convert_fcdate}.{num}')
+            
+            all_storms = []
+            
+            # loop through basins and read files
+            for basin in basins:
+                # open up single basin file
+                with open(basin, "r") as f:
+                    lines = f.readlines()
+            
+                if len(lines) > 1:
+                    storms = hpy.load(basin,source='ecmwf')
+                    n = storms.sizes['record']
+                    # add dimension with basin
+                    storms = storms.assign_coords(basin=('record', np.repeat(basin, n)))
+            
+                    all_storms.append(storms)
+            
+            # concatenate along the existing 'record' axis
+            if not all_storms: # np storms exist so skip this member
+                combined = xr.Dataset().assign_coords(record=[])
+            else:
+                combined = xr.concat(
+                    all_storms,
+                    dim='record',
+                    join='outer',                       # allow variables that may be missing in some basins
+                    combine_attrs='drop_conflicts'      # avoid attribute conflicts
+                )
+            
+            if 'basin' in combined.coords:
+                combined = combined.reset_coords('basin')
+            
+            # enforce a consistent variable ordering
+            desired_vars = ['track_id','time','lat','lon','wind','pres','lat_wind','lon_wind','basin']
+            available = [v for v in desired_vars if v in combined.variables]
+            combined = combined[available]
+            
+            # Skip if empty
+            if 'record' not in combined.sizes or combined.sizes['record'] == 0:
+                # empty dataset for this ensemble member
+                combined = empty_member_dataset()
+                all_fcs.append(combined)
+                continue
+
+            n = combined.sizes['record']
+            lagged_ens_num = num+(num_ens_mems*lag_i)+1 # create a new ensemble number based on lag*num_ens_mem
+            combined = combined.assign_coords(ens_mem=('record', np.repeat(lagged_ens_num, n)))
+        
+            all_fcs.append(combined)
+        
+            # remove extracted file
+            os.remove(f"{short_name}.{convert_fcdate}.{num}")
+        lag_i = lag_i + 1
+
+    # concatenate along the existing 'record' axis
+    combined_allens = xr.concat(
+            all_fcs,
+            dim='record',
+            join='outer',                       # allow variables that may be missing in some basins
+            combine_attrs='drop_conflicts'      # avoid attribute conflicts
+        )
+    
+    combined_allens = combined_allens.reset_coords('ens_mem')
+    combined_allens = combined_allens[['track_id', 'time', 'lat', 'lon', 'wind', 'pres', 'lat_wind', 'lon_wind', 'basin','ens_mem']]
+    
+    vars_to_drop = ['lat_wind','lon_wind']
+    combined_allens = combined_allens.drop_vars([v for v in vars_to_drop if v in combined_allens.variables])
+
+    # using the combined_allens xarray, select TCs within chosen leadtimes
+    print (combined_allens)
+
+    # using requested leadtime_hour and fcdate, only keep storms on requested valid times
+    t0 = datetime.strptime(fcdate, "%Y%m%d")
+    valid_dates = [t0 + timedelta(hours=int(h)) for h in leadtime_hour]
+
+    # make same version
+    valid_np = np.array(valid_dates, dtype='datetime64[ns]')
+    times_np = combined_allens['time'].values.astype('datetime64[ns]')
+
+    # mask
+    mask = np.isin(times_np, valid_np)
+
+    # Subset  
+    combined_allens = combined_allens.isel(record=mask)
+
+    combined_allens.to_netcdf(f"{filename_save}.nc")
+    
+    print(f"downloaded TC tracks for {num_ens_mems*lag_i} ensemble members for model {model} at fc_date {fcdate}. Saved as netcdf output under filename, {filename_save}")
+
+    # then will need to remove basin files from last ensemble member
+    for basin in basins:
+        os.remove(f"{basin}")
+    os.remove(f"{fn}") # plus remove original tar file downloaded

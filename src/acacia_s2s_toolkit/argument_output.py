@@ -69,25 +69,42 @@ def get_timeresolution(variable):
         return None
     return time_resolution
 
-def output_leadtime_hour(variable,origin_id,fcdate,fc_enslags,start_time=0):
-    '''
-    Given variable (variable abbreivation), output suitable leadtime_hour. The leadtime_hour will request all avaliable steps. Users should be able to pre-define leadtime_hour if they do not want all output.
-    return: leadtime_hour
-    '''
+def output_leadtime_hour(variable, origin_id, fcdate, fc_enslags, start_time=0):
+    """
+    Given variable (variable abbreviation), output suitable leadtime_hour.
+    This version keeps original behaviour EXCEPT:
+      - If model is JMA ('rjtd')
+      - AND field is instantaneous 24-hour (not averaged)
+      - AND it's a forecast (i.e., any negative lag)
+    then 0-hour is removed at the end.
+
+    Reforecasts (fc_enslags == 0) keep the 0-hour.
+    All other models keep the 0-hour.
+    """
+
     time_resolution = get_timeresolution(variable)
 
-    # next find maximum end time
-    end_time = get_single_parameter(origin_id,fcdate,'fcLength')
+    # find forecast length
+    end_time = int(get_single_parameter(origin_id, fcdate, 'fcLength'))
 
-    # given time resolution, work out array of appropriate time values
+    # determine step size
     if time_resolution.endswith('6hrly'):
-        leadtime_hour = np.arange(start_time,end_time+1,6)
+        step_hours = 6
     else:
-        leadtime_hour = np.arange(start_time,end_time+1,24) # will output 0 to 1104 in steps of 24 (ECMWF example). 
- 
-    # take the minimum value in fc_enslags and multiply by 24
-    #max_endtime = end_time+(24*np.min(fc_enslags)) # so 1104 + (24*-2) = 1056
-    #leadtime_hour = leadtime_hour[leadtime_hour <= max_endtime]
+        step_hours = 24  # instantaneous or averaged daily
+
+    # build normal leadtime list
+    leadtime_hour = np.arange(start_time, end_time + 1, step_hours, dtype=int)
+
+    # === JMA NO-0-HOUR RULE (only for forecasts, not reforecasts) ===
+    is_jma = (origin_id == 'rjtd')
+    is_instant_24 = (step_hours == 24 and not time_resolution.startswith('aver'))
+    fc_enslags_arr = np.atleast_1d(fc_enslags)
+    #is_reforecast = np.all(fc_enslags_arr == 0)   # in reforecasts, JMA *does* output 0
+
+    if is_jma and is_instant_24:
+        # JMA forecasts do not include 0
+        leadtime_hour = leadtime_hour[leadtime_hour != 0]
 
     return leadtime_hour
 
@@ -249,8 +266,10 @@ def output_hc_lags(origin_id,fcdate):
     if "unique" == lag_type:
         # ECMWF ---- odd day reforecasts.
         if rf_freq_info == 'odddates':
-            if (dayofmonth % 2 == 0) or (dayofmonth == 29 and fcdate_obj.month() == 2):
+            if (dayofmonth % 2 == 0) or (dayofmonth == 29 and fcdate_obj.month == 2):
                 return [-1,1] # for even fcdates (or 29th Feb) chosen rfdate before and after forecast date.
+            elif (dayofmonth == 1) and (fcdate_obj.month == 1): # for 1st Jan, choose 31st Dec and 1st Jan
+                return [-1,0]
             else:
                 return [-2,0] # for odd dates, choosen current day, minus 2. 
         if rf_freq_info == 'CNRevery5days': # roughly five days
@@ -332,12 +351,105 @@ def get_hindcast_year_span(origin_id,fcdate):
 
     return rf_years
 
-def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_enslags=0):
+def output_formatted_leadtimes(leadtime_hour, fcdate, variable, origin_id, lag=0, fc_enslags=0):
+    print(fc_enslags)
+
+    # ------------ NORMALISE INPUTS ------------
+    leadtime_hour_arr = np.atleast_1d(leadtime_hour).astype(int)
+    fc_enslags_arr = np.atleast_1d(fc_enslags) if np.size(fc_enslags) else np.array([0])
+
+    # ---------- SHIFTED FORECAST DATE ----------
+    new_fcdate = datetime.strptime(fcdate, '%Y%m%d') + timedelta(days=float(lag))
+    convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
+
+    # ---------- TIME RESOLUTION ----------
+    time_resolution = get_timeresolution(variable)
+
+    if time_resolution.endswith("6hrly"):
+        step_hours = 6
+    else:
+        step_hours = 24
+
+    # ---------- ALL POSSIBLE LEADTIMES ----------
+    leadtime_hour_ALL = np.asarray(
+        output_leadtime_hour(variable, origin_id, fcdate, fc_enslags_arr)
+    )
+    if leadtime_hour_ALL.size == 0:
+        raise ValueError("[ERROR] No leadtimes available.")
+
+    grid_max = int(leadtime_hour_ALL.max())
+
+    # Refine step from actual array
+    if len(leadtime_hour_ALL) > 1:
+        diffs = np.diff(leadtime_hour_ALL)
+        pos = diffs[diffs > 0]
+        if pos.size > 0:
+            step_hours = int(pos.min())
+
+    # ---------- MODEL-SPECIFIC MINIMUM VALID START ----------
+    is_jma = (origin_id == "rjtd")
+    is_instant_24 = (step_hours == 24 and not time_resolution.startswith("aver"))
+    model_min_start_h = 24 if (is_jma and is_instant_24) else 0
+
+    # ---------- USER VALID TIME WINDOW ----------
+    VT_start_req = leadtime_hour_arr.min()
+    VT_end_req   = leadtime_hour_arr.max()
+
+    # Apply minimum valid start
+    VT_start = max(VT_start_req, model_min_start_h)
+
+    # ---------- PER-LAG VALID-TIME CEILING ----------
+    lag_offset_hours = abs(int(lag)) * 24
+    VT_end = min(VT_end_req, grid_max - lag_offset_hours)
+
+    if VT_end < VT_start:
+        raise ValueError(
+            f"No valid-time window for lag={lag}: VT_start={VT_start}, VT_end={VT_end}"
+        )
+
+    # ---------- FILTER VALID TIMES BEFORE ALIGNMENT (CRUCIAL FIX) ----------
+    VT_filtered = leadtime_hour_arr[
+        (leadtime_hour_arr >= VT_start) & (leadtime_hour_arr <= VT_end)
+    ]
+
+    # ---------- ALIGN VALID TIMES TO LEADTIMES ----------
+    aligned_leadtimes = VT_filtered + lag_offset_hours
+
+    # ---------- STRICT GRID CHECK (Option B) ----------
+    matched = np.intersect1d(aligned_leadtimes, leadtime_hour_ALL)
+    if matched.size != aligned_leadtimes.size:
+        missing = aligned_leadtimes[
+            np.isin(aligned_leadtimes, leadtime_hour_ALL, invert=True)
+        ]
+        raise ValueError(
+            f"[ERROR] One or more aligned leadtimes are not available:\n"
+            f"Requested valid times: {leadtime_hour_arr}\n"
+            f"Aligned leadtimes:     {aligned_leadtimes}\n"
+            f"Missing:               {missing}"
+        )
+
+    leadtime_hour_copy = matched
+
+    # ---------- JMA SAFETY NET ----------
+    if is_jma and is_instant_24:
+        leadtime_hour_copy = leadtime_hour_copy[leadtime_hour_copy != 0]
+        if leadtime_hour_copy.size == 0:
+            raise ValueError("[ERROR] No JMA 24h valid leadtimes remain.")
+
+    # ---------- BUILD OUTPUT STRING ----------
+    if time_resolution.startswith("aver"):
+        leadtimes = "/".join(f"{h}-{h+24}" for h in leadtime_hour_copy)
+    else:
+        leadtimes = "/".join(str(int(h)) for h in leadtime_hour_copy)
+
+    return leadtimes, convert_fcdate
+
+def output_formatted_leadtimes_OLD(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_enslags=0):
     ''' lag is always negative for forecast. Function always uses lag=0 for reforecast download'''
 
     print (fc_enslags)
 
-    # create new fcdate based on lag
+    # create new fcdate based on lag. This will output as YYYY-MM-DD for webAPI request
     new_fcdate = datetime.strptime(fcdate, '%Y%m%d')+timedelta(days=float(lag))
     convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
 
@@ -347,38 +459,75 @@ def output_formatted_leadtimes(leadtime_hour,fcdate,variable,origin_id,lag=0,fc_
     if np.max(leadtime_hour) > fc_length-(24.0*np.min(fc_enslags)):
         raise ValueError(f"[ERROR] The maximum requested leadtime hour is greater than the forecast length - the largest change in lagged ensemble (hours).")
 
-    # convert leadtimes
-    # is it an average field?
+    # get time_resolution of variable (is it daily or 6-hourly)
     time_resolution = get_timeresolution(variable)
 
-    # get standard, all leadtime hours avaliable
+    # work out appropriate leadtimes
+    # given fc_enslags, define 'leadtime_hours' that will cause misalignment
+    # first get all leadtime_hours possible
     leadtime_hour_ALL = output_leadtime_hour(variable,origin_id,fcdate,fc_enslags)
+    min_lag = np.min(fc_enslags) # minimum forecast enslag
+    outside_lts_init = leadtime_hour_ALL[:min_lag*-1]  # define outside leadtimes
+    outside_lts_end = leadtime_hour_ALL[min_lag:]
 
-    # find the indexes of the requested leadtimes (leadtime_hour)
-    idx = np.asarray([np.where(leadtime_hour_ALL == lt)[0][0] for lt in leadtime_hour]) # get the indexes of where the requested leadtime hours are
+    # check whether requested leadtime_hour is in outside_lts_init or outside_lts_end (leave a true or false key).
+    lt_hour_outside_lag = (leadtime_hour in outside_lts_init) or (leadtime_hour in outside_lts_end) # if TRUE go for boxed (only select leadtimes within) if FALSE, just push idx
 
-    # if an average field, use '0-24/24-48/48-72...'
-    leadtime_hour_copy = leadtime_hour[:]
+    if lt_hour_outside_lag == True:
+        # get all indexes possible
+        all_idx = np.asarray([np.where(leadtime_hour_ALL == lt)[0][0] for lt in leadtime_hour_ALL])
 
-    if time_resolution.endswith('6hrly'):
-        nsteps_per_day = 4
-        new_idx = idx-lag*nsteps_per_day
-    else: # instantaneous field
-        new_idx = idx-lag
+        # select the list of leadtimes that will be consisent with all selected forecasts
 
-    # check index is no larger than forecast length
-    if np.max(new_idx) > len(leadtime_hour_ALL):
-        raise ValueError(f"[ERROR] The maximum requested leadtime hour is greater than the forecast length, i.e. when performing lagged forecast ensemble, it can reach the last few timesteps.")
+        if time_resolution.endswith('6hrly'):
+            nsteps_per_day = 4
+            lag_mult = lag*4
+            min_lag_mult = lag_mult*4
+            rm_out_idx = all_idx[lag_mult:min_lag_mult-lag_mult]
+        else: # instantaneous field
+            rm_out_idx = all_idx[lag:min_lag-lag]
 
-    leadtime_hour_copy=leadtime_hour_ALL[new_idx]
+        # then you only wants index that are in selected leadtime hours + not outside bounds
+        idx = np.asarray([np.where(leadtime_hour_ALL == lt)[0][0] for lt in leadtime_hour])
+        # is within idx and rm_out_idx
+        new_idx = np.intersect1d(idx, rm_out_idx) # contains both set of indexes. 
+        
+        leadtime_hour_copy=leadtime_hour_ALL[new_idx]
+        print (new_idx)
+        print (leadtime_hour_copy)
+
+    elif lt_hour_outside_lag == False:
+        # if none of the requested leadtimes are within the period of init+min(fc_enslag), just shift selected leadtime by appropriate lag
+        # find the indexes of the requested leadtimes (leadtime_hour)
+        idx = np.asarray([np.where(leadtime_hour_ALL == lt)[0][0] for lt in leadtime_hour]) # get the indexes of where the requested leadtime hours are
+
+        # if an average field, use '0-24/24-48/48-72...'
+        leadtime_hour_copy = leadtime_hour[:]
+
+        if time_resolution.endswith('6hrly'):
+            nsteps_per_day = 4
+            new_idx = idx-lag*nsteps_per_day
+        else: # instantaneous field
+            new_idx = idx-lag
+
+        # check index is no larger than forecast length
+        if np.max(new_idx) > len(leadtime_hour_ALL):
+            raise ValueError(f"[ERROR] The maximum requested leadtime hour is greater than the forecast length, i.e. when performing lagged forecast ensemble, it can reach the last few timesteps.")
+
+        print (new_idx)
+
+        leadtime_hour_copy=leadtime_hour_ALL[new_idx]
+        print (leadtime_hour_copy)
 
     if time_resolution.startswith('aver'):
         leadtimes='/'.join(f"{leadtime_hour_copy[i]}-{leadtime_hour_copy[i]+24}" for i in range(len(leadtime_hour_copy)-1))
     else: # instantaneous field
         leadtimes = '/'.join(str(x) for x in leadtime_hour_copy)
     
-    print (leadtimes)
-    
+    #if origin_id == 'rjtd' and leadtimes[:2] == '0/': # remove first lead time if JMA and first leadtime is 0, JMA doesn't output initial value
+    #    leadtimes = leadtimes[2:]
+    #print (leadtimes)
+
     return leadtimes, convert_fcdate
 
 def create_reforecast_dates(rfyears,rfdate):

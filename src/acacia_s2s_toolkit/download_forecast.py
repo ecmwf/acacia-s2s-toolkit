@@ -1,5 +1,5 @@
 # download sub-seasonal forecast data from WMO lead centre
-from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests
+from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests, download_S2Stc_tracks
 import os
 import sys
 import datetime
@@ -150,19 +150,33 @@ def download_forecast(model,
 
     # Request with suppression logic
     # print(">>>> DEBUG PLEVS GOING TO REQUEST:", plevs)
+
+    # WEBAPI REQUEST FROM S2S DATABASE
     
-    try:
-        if verbose:
-            webAPI_requests.request_forecast(fcdate,origin_id,grid,variable,bbox_bounds,data_format,
-                    webapi_param,leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
-        else:
-            with SuppressOutput():
-                webAPI_requests.request_forecast(fcdate,origin_id,grid,variable,bbox_bounds,data_format,webapi_param,
-                        leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
-    except Exception as e:
-        # Re-raise but ensure logs aren't hidden if debugging
-        print(f"[ERROR] Download failed for {filename_save}")
-        raise
+    if variable != 'TC_TRACKS':
+        try:
+            if verbose:
+                webAPI_requests.request_forecast(fcdate,origin_id,grid,variable,bbox_bounds,data_format,
+                        webapi_param,leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
+            else:
+                with SuppressOutput():
+                    webAPI_requests.request_forecast(fcdate,origin_id,grid,variable,bbox_bounds,data_format,webapi_param,
+                            leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
+        except Exception as e:
+            # Re-raise but ensure logs aren't hidden if debugging
+            print(f"[ERROR] Download failed for {filename_save}")
+            raise
+    elif variable == 'TC_TRACKS': # downloading from Frederic's TC tracks.
+        try:
+            if verbose:
+                download_S2Stc_tracks.download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
+            else:
+                with SuppressOutput():
+                    download_S2Stc_tracks.download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
+        except Exception as e:
+            # Re-raise but ensure logs aren't hidden if debugging
+            print(f"[ERROR] Download failed for {filename_save}")
+            raise
 
     return filename_save
 
