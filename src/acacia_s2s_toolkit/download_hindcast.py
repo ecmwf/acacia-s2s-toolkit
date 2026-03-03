@@ -1,5 +1,5 @@
 # download sub-seasonal reforecast from S2S Database
-from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests
+from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests, download_S2Stc_tracks
 import os
 import sys
 import datetime
@@ -158,17 +158,24 @@ def download_hindcast(model,
     # Request with suppression logic
     # print(">>>> DEBUG PLEVS GOING TO REQUEST:", plevs)
     try:
-        if verbose:
-            webAPI_requests.request_hindcast(
-                fcdate, origin_id, grid, variable, bbox_bounds, data_format, webapi_param,
-                leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years, fc_time
-            )
-        else:
-            with SuppressOutput():
+        if variable != 'TC_TRACKS':
+            if verbose:
                 webAPI_requests.request_hindcast(
                     fcdate, origin_id, grid, variable, bbox_bounds, data_format, webapi_param,
                     leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years, fc_time
                 )
+            else:
+                with SuppressOutput():
+                    webAPI_requests.request_hindcast(
+                        fcdate, origin_id, grid, variable, bbox_bounds, data_format, webapi_param,
+                        leadtime_hour, leveltype, filename_save, plevs, rf_enslags, rf_years, fc_time
+                    )
+        elif variable == 'TC_TRACKS':
+            if verbose:
+                download_S2Stc_tracks.download_reforecast_TCtracks(fcdate, model,origin_id,leadtime_hour,filename_save, rf_enslags, rf_years, fc_time)
+            else:
+                with SuppressOutput():
+                    download_S2Stc_tracks.download_reforecast_TCtracks(fcdate, model,origin_id,leadtime_hour,filename_save, rf_enslags, rf_years, fc_time)
     except Exception as e:
         # Re-raise but ensure logs aren't hidden if debugging
         print(f"[ERROR] Download failed for {filename_save}")
