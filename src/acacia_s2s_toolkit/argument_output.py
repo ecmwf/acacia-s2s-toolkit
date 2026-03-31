@@ -5,6 +5,7 @@ from importlib import resources
 import numpy as np
 import pandas as pd
 import ast
+import calendar
 
 def read_lookup_table(fcdate='20250828'):
     # convert fcdate to a time field. 
@@ -303,8 +304,33 @@ def output_hc_lags(origin_id,fcdate):
 
             largest_neg = max(neg_lags) if neg_lags else None
             smallest_pos = min(pos_lags) if pos_lags else None
+            
+            # need to change lag if leap year. the lags are calculated with year 2020 in mind but it may be the case that the chosen forecasted year is not a leap year, hence day lags will be out by 1.
+            fc_is_leap_year = calendar.isleap(datetime.strptime(fcdate,'%Y%m%d').year)
+            leap_day_2020 = datetime(2020,2,29)
+            # Adjust largest_neg
+            if (largest_neg is not None) and (not fc_is_leap_year):
+                ref_dt_neg = fc_date_2020 + timedelta(days=largest_neg)
+                if crosses_leap_day(ref_dt_neg, fc_date_2020, leap_day_2020):
+                    # Remove the extra day: shrink |lag| by 1.
+                    # Since it's negative, add +1 (e.g., -10 -> -9)
+                    largest_neg = largest_neg + 1
+        
+            # Adjust smallest_pos
+            if (smallest_pos is not None) and (not fc_is_leap_year):
+                ref_dt_pos = fc_date_2020 + timedelta(days=smallest_pos)
+                if crosses_leap_day(ref_dt_pos, fc_date_2020, leap_day_2020):
+                    # Remove the extra day: shrink |lag| by 1.
+                    # Since it's non-negative, subtract 1 (e.g., 10 -> 9)
+                    smallest_pos = smallest_pos - 1
+        
+            return [largest_neg,smallest_pos]
 
-            return [largest_neg,smallest_pos] 
+
+def crosses_leap_day(ref_dt, anchor_dt, leap_day):
+    """True if the closed-open interval between ref_dt and anchor_dt crosses leap_day."""
+    # (ref <= leap_day < anchor) or (anchor <= leap_day < ref)
+    return (ref_dt <= leap_day < anchor_dt) or (anchor_dt <= leap_day < ref_dt)
 
 def two_Monday_Thursday_rfdates(fcdate):
     '''
