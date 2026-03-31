@@ -19,7 +19,7 @@ After this, use `download_forecast` to download operational forecasts:
 
 .. code-block:: python
 
-   download_forecast(model, variable, fcdate=None, plevs=None, location_name=None, bbox_bounds=[90, -180, -90, 180], filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", leadtime_hour=None, fc_enslags=None, overwrite=False, verbose=True)
+   download_forecast(model, variable, fcdate=None, plevs=None, country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", leadtime_hour=None, fc_enslags=None, overwrite=False, verbose=True)
 
 :Necessary parameters:
 
@@ -48,12 +48,18 @@ Currently a download request is required for each variable.
 
 - **plevs** (*int or list of int*, optional): Pressure levels in hPa for pressure-level variables. Avaliable levels include 1000, 925, 850, 700, 500, 300, 200, 100, 50 and 10 hPa.  
 
-- **location_name** (*str*, optional): Predefined geographic region. Overrides ``bbox_bounds`` if provided. Current supported values include:
-  
+- **country_name** (*str*, optional): Country name used to derive bounds automatically from Natural Earth country polygons. Overrides ``bbox_bounds`` and ``region_name`` if provided. Current supported values include:
+
   - ``"ethiopia"``
   - ``"kenya"``
   - ``"madagascar"``
   - ``"eastafrica"``
+
+- **region_name** (*str*, optional): Predefined domain name. Overrides ``bbox_bounds`` if provided. Current supported values include:
+
+  - ``"westafrica"``
+  - ``"eastafrica"``
+  - ``"southernafrica"``
 
 - **bbox_bounds** (*list of float*, optional, default ``[90, -180, -90, 180]``): Geographic bounding box in the order ``[north, west, south, east]`` (degrees latitude/longitude). Overridden if ``location_name`` is provided.
 

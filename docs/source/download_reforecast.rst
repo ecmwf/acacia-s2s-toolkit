@@ -19,7 +19,7 @@ After this, use the `download_hindcast` function to download operational reforec
 
 .. code-block:: python
 
-   download_hindcast(model, variable, fcdate=None, plevs=None, location_name=None, bbox_bounds=[90, -180, -90, 180], filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", leadtime_hour=None, rf_years=None, rf_enslags=None, fc_time=True, overwrite=False, verbose=True)
+   download_hindcast(model, variable, fcdate=None, plevs=None, country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", leadtime_hour=None, rf_years=None, rf_enslags=None, fc_time=True, overwrite=False, verbose=True)
 
 This function retrieves operational reforecast (hindcast) data for a specified model and variable from the S2S database. It supports downloading multiple initialization years and ensemble lags for a given forecasting system.
 
