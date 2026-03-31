@@ -9,6 +9,7 @@ import xarray as xr
 from datetime import datetime, timedelta
 from ecmwfapi import ECMWFDataServer
 server = ECMWFDataServer()
+import subprocess
 
 def create_initial_webAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes,filename):
     request_dict = {
@@ -75,8 +76,24 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # once requesting control and perturbed forecast, combine the two.
         # set forecast type in control to pf (perturbed forecast).
         set_cf_to_pf(f'{filename}_control_{lag}',f'{filename}_control2_{lag}')
+        
         # merge both control and perturbed forecast
-        os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}')
+        # os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}')
+        
+        # os.system is blunt and gives poor error handling.
+        # This solution is a slightly safer version that hides warnings but still reports actual failures
+        cmd = f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode != 0:
+            print(result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+    
 
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # smae process following even with one forecast initialisation date to ensure same structure for all output. 
@@ -147,8 +164,24 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # once requesting control and perturbed forecast, combine the two.
         # set forecast type in control to pf (perturbed forecast).
         set_cf_to_pf(f'{filename}_control_{lag}',f'{filename}_control2_{lag}')
-        # merge both control and perturbed forecast
-        os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag} 2>/dev/null')
+
+        # Merge control and perturbed forecast members into one file.
+        # os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag} 2>/dev/null')
+        # We suppress routine CDO warning noise, but still raise on real failures.
+        cmd = f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
+
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print(result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+    
         # shift the time so all reforecasts have the same time values
         if fc_time:
             shift_day_value = lag*-1
@@ -197,4 +230,3 @@ def set_cf_to_pf(input_file, output_file):
             ec.codes_set(gid, 'type', 'pf')
             ec.codes_write(gid,fout)
             ec.codes_release(gid)
-
