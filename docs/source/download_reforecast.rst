@@ -37,7 +37,7 @@ Each variable must be requested separately.
 
 Parameters including **fcdate**, **plevs**, **location_name**, **bbox_bounds**, **filename**, **data_save_dir**, **data_format**, **grid**, **leadtime_hour**, **overwrite** and **verbose** are described in detail on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. Additional parameters specific to reforecast downloads include:
 
-- **rf_years** (*list of int*, optional): List of years to download reforecasts for. For example, [2000, 2001, 2002] will retrieve all reforecasts initialised between 2000 and 2002. 
+- **rf_years** (*list of int*, optional): List of years to download reforecasts for. For example, [2000, 2001, 2002] will retrieve all reforecasts initialised between 2000 and 2002. Please note, due to changes when transferring to ECMWF Climate Data Store, all rf_years will be downloaded between the minimum and maximum of requested rf_years. 
 
 - **rf_enslags** (*list of int*, optional): List of lagged ensemble members (in days) relative to the forecast initialization date. Default values depend on the selected model; see the following `confluence page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_ for details. 
 

@@ -1,5 +1,5 @@
 # download sub-seasonal reforecast from S2S Database
-from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests, download_S2Stc_tracks
+from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requests, download_S2Stc_tracks
 import os
 import sys
 import datetime
@@ -341,7 +341,7 @@ def download_hindcast(model,
     try:
         if variable != 'TC_TRACKS':
             if verbose:
-                webAPI_requests.request_hindcast(
+                ecdsAPI_requests.request_hindcast(
                     fcdate,
                     origin_id,
                     grid_for_request,
@@ -359,7 +359,7 @@ def download_hindcast(model,
                 )
             else:
                 with SuppressOutput():
-                    webAPI_requests.request_hindcast(
+                    ecdsAPI_requests.request_hindcast(
                         fcdate,
                         origin_id,
                         grid_for_request,

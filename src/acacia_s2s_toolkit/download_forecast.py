@@ -1,5 +1,5 @@
 # download sub-seasonal forecast data from WMO lead centre
-from acacia_s2s_toolkit import argument_check, argument_output, webAPI_requests, download_S2Stc_tracks
+from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requests, download_S2Stc_tracks
 import os
 import sys
 import datetime
@@ -335,7 +335,7 @@ def download_forecast(model,
     if variable != 'TC_TRACKS':
         try:
             if verbose:
-                webAPI_requests.request_forecast(
+                ecdsAPI_requests.request_forecast(
                     fcdate,
                     origin_id,
                     grid_for_request,
@@ -351,7 +351,7 @@ def download_forecast(model,
                 )
             else:
                 with SuppressOutput():
-                    webAPI_requests.request_forecast(
+                    ecdsAPI_requests.request_forecast(
                         fcdate,
                         origin_id,
                         grid_for_request,

@@ -560,13 +560,21 @@ def create_reforecast_dates(rfyears,rfdate):
     ''' function that produces a list of reforecast dates given set of years and chosen reforecast date
     '''
     if np.size(rfdate) == 1: # for a single reforecast date that is then repeated for all reforecast years
-        DOY = rfdate[4:]
-        rf_dates = '/'.join(f"{int(year)}{DOY}" for year in rfyears)
+        YY = rfdate[:4]
+        MM = rfdate[4:6]
+        DD = rfdate[6:]
+        # only select first and last year
+        rf_dates = '/'.join(f"{int(year)}-{MM}-{DD}" for year in rfyears[[0,-1]])
     else:
-        rf_dates = '/'.join(f"{date}" for date in rfdate) 
+        stored_dates = []
+        for date in rfdate:
+            YY = date[:4]
+            MM = date[4:6]
+            DD = date[6:]
+            stored_dates.append(f"{YY}-{MM}-{DD}")
+        rf_dates = '/'.join(f"{date}" for date in stored_dates) 
     return rf_dates
  
-
 def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags):
     # check variable name. Is the variable name one of the abbreviations?
     argument_check.check_requested_variable(variable)

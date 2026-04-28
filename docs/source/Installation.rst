@@ -31,30 +31,30 @@ To upgrade to the latest version, run:
 Necessary requirements
 ------------
 
-Saving ECMWF webAPI credentials
+Saving ECMWF Data Store credentials
 ~~~~~~~~~~~~~~~~~~~~~~
-At the time of writing, sub-seasonal forecast data from `ECMWF's S2S database <https://apps.ecmwf.int/datasets/data/s2s-realtime-instantaneous-accum-ecmf/levtype=sfc/type=cf/>`_ is made available through ECMWF's webAPI. To download data from the ECMWF webAPI, you need to configure your ECMWF API key.
+At the time of writing, sub-seasonal forecast data from `ECMWF's S2S database <https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview>`_ is made available through ECMWF's Data Store. To download data from the ECMWF Data Store, you need to configure your CDS API key.
 
-After registering for an ECMWF account, your API credentials can be found at `https://api.ecmwf.int/v1/key <https://api.ecmwf.int/v1/key>`_. 
+After registering for an ECMWF account, your API credentials can be found at `https://ecds.ecmwf.int/how-to-api`_. 
 
-Save these credentials to your home directory as a file named ``~/.ecmwfapirc`` .
+For the acacia_s2s_toolkit, please save these credentials to your home directory as a file named ``~/.cdsapirc.ecds``. 
+
+.. important::
+    Please note that the credentials should be saved in a file called ``~/.cdsapirc.ecds`` and not the default ``~/.cdsapirc``. This is to avoid confusion with API credentials accessing ECMWF Climate Data Store (i.e. for ERA5 data). 
 
 Installing ECMWF client libraries
 ~~~~~~~~~~~~~~~~~~~~~~
-Once your ECMWF webAPI credentials are saved, install the ECMWF client library using ``pip``:
+Once your ECMWF webAPI credentials are saved, install the CDS API client using ``pip``:
 
 .. code-block:: console
 
-   pip install ecmwf-api-client
+   pip install "cdsapi>=0.7.7"
 
 This package provides the necessary client functions for accessing ECMWF data.
 
-.. important::
-    Access to data stored on ECMWF's S2S database will be changing from webAPI to cdsAPI. The new system relies on retrieval scripts compatible with the Climate Data Store (CDS). This package will be updated to support the new system after the transition is complete.
-
 Additional package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~
-In addition to requiring "*ecmwf-api-client*", this package depends on the following libraries:
+In addition to requiring "*cdsapi*", this package depends on the following libraries:
 
 - **numpy** (version 1.23 or higher)
 - **cdo** (versions 2.4.0 or higher)
@@ -78,12 +78,12 @@ Quick checklist
 Before attempting to download sub-seasonal forecast data using this python tool, please ensure you have performed the following steps:
 
 1. `Python 3 <https://www.python.org/downloads/>`_ is installed
-2. The Python packages **acacia_s2s_toolkit** and **ecmwf-api-client** are installed. 
-3. Your ECMWF webAPI credentials are saved in ``~/.ecmwfapirc`` on your working environment.
+2. The Python packages **acacia_s2s_toolkit** and **cdsapi** are installed. 
+3. Your ECMWF webAPI credentials are saved in ``~/.cdsapirc.ecds`` on your working environment.
 
 
 Further information
 ------------
 
-For more details on setting up access to ECMWF public datasets, please visit `access ECMWF public datasets <https://confluence.ecmwf.int/display/WEBAPI/Access+ECMWF+Public+Datasets#AccessECMWFPublicDatasets-availability>`_
+For more details on setting up and using ECMWF Data Store, please visit `using the ECMWF data store <https://confluence.ecmwf.int/display/DAC/Using+the+ECMWF+data+store+-+ECDS>`_
 

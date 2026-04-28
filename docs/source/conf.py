@@ -7,8 +7,8 @@ import os
 
 # -- Project information
 
-project = 'AI_Weather_Quest'
-copyright = '2025, Joshua Talib + AI Weather Quest contributors'
+project = 'ACACIA_S2S_TOOLKIT'
+copyright = '2025, Joshua Talib + ACACIA contributors'
 author = 'Joshua Talib'
 
 release = '1.0'
