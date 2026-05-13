@@ -1074,25 +1074,24 @@ def biascorrection_meanvariance(forecast,hindcast,observed):
         ob=observed.sel(lead_time=lead_time)
 
         #calculating variance, or actually standard deviation
-        hcsd=hc.var(["member","init_date"])**2
+        hcsd=hc.std(["member","init_date"])
         
         #making sure no zeros
         hcsd = hcsd.where(hcsd != 0)
 
         #calculating variance adjustment
-        variance_correction=(ob.var(["init_date"])**2)/hcsd
+        std_correction=ob.std(["init_date"])/hcsd
         
         #adjusting hindcast    
-        hcadj=((hc-hc.mean(["member","init_date"]))*variance_correction)+ob.mean(["init_date"])
+        hcadj=((hc-hc.mean(["member","init_date"]))*std_correction)+ob.mean(["init_date"])
 
         #inserting adjusted data into the output array 
         hindcast_adjusted.loc[dict(lead_time=lead_time)]=hcadj.data
 
         #adjusting forecast
-        fcadj=((fc-fc.mean(["member","init_date"]))*variance_correction)+ob.mean(["init_date"])
+        fcadj=((fc-fc.mean(["member","init_date"]))*std_correction)+ob.mean(["init_date"])
         
         forecast_adjusted.loc[dict(lead_time=lead_time)]=fcadj.data
-    
     return forecast_adjusted, hindcast_adjusted
 
 

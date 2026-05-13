@@ -1,6 +1,6 @@
 #
 install_as_local_package.sh
-tests/data
+example_notebooks/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
