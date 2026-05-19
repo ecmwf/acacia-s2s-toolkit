@@ -23,7 +23,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     'nbsphinx',
-    'myst-nb'
+    'myst_nb'
     ]
 
 intersphinx_mapping = {
