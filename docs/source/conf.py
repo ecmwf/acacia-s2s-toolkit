@@ -40,6 +40,7 @@ nb_execution_mode = "off"
 
 html_theme = 'sphinx_rtd_theme'
 html_logo = os.path.abspath("acacia_logo.png")
+autodoc_mock_imports = ["esmpy", "xesmf"]
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
