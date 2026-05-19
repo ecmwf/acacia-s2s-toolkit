@@ -23,10 +23,25 @@ Main authors
 
 Contents
 --------
-
 .. toctree::
+   :maxdepth: 1
+   :caption: Core
 
    Installation
    download_forecasts
    download_reforecast
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Example notebooks
+
+   notebooks/deterministic_forecast_example
+   notebooks/probabilistic_forecast_example
+   notebooks/bias_correction_example
+   notebooks/postprocessing_basic_example
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Other
+
    tips_faq
