@@ -35,7 +35,7 @@ Saving ECMWF Data Store credentials
 ~~~~~~~~~~~~~~~~~~~~~~
 At the time of writing, sub-seasonal forecast data from `WWRP/WCRP's S2S database <https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview>`_ is made available through ECMWF's Data Store. To download data from the ECMWF Data Store, you need to configure your CDS API key.
 
-After registering for an ECMWF account, your API credentials can be found at `https://ecds.ecmwf.int/how-to-api`_. 
+After registering for an ECMWF account, your API credentials can be found on the following `API setup page <https://ecds.ecmwf.int/how-to-api>`_.
 
 For the acacia_s2s_toolkit, please save these credentials to your home directory as a file named ``~/.cdsapirc.ecds``. 
 
