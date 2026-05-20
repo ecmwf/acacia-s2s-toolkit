@@ -8,6 +8,9 @@ import huracanpy as hpy
 from acacia_s2s_toolkit import argument_output
 from datetime import datetime, timedelta
 
+# this is for sphinx - only functions listed here will have entries in readthedocs API
+__all__ = ["download_forecast_TCtracks", "download_reforecast_TCtracks"]
+
 def empty_member_dataset():
     return xr.Dataset(
         data_vars={
