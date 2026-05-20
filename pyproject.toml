@@ -5,7 +5,7 @@ authors = [
   {name="Innocent Masukwedza", email="g.t.masukwedza@reading.ac.uk"},
   {name="Piotr Wolski",email="wolski@csag.uct.ac.za"}
 ]
-version = "2.31"
+version = "2.32"
 description = "A python package to support download and analysis of forecasts from S2S prediction project database."
 readme = "README.md"
 requires-python = ">=3.8"
