@@ -1,48 +1,113 @@
+
+
 <!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<html lang="en" data-content_root="./">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Getting started &mdash; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
 
-    <title>Getting started &#8212; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
-    <script src="_static/documentation_options.js?v=f2a433a1"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Downloading operational forecasts" href="download_forecasts.html" />
-    <link rel="prev" title="Welcome to acacia_s2s_toolkit’s documentation!" href="index.html" />
-   
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
-  
+    <link rel="prev" title="Welcome to acacia_s2s_toolkit’s documentation!" href="index.html" /> 
+</head>
 
-  
-  
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
 
-  </head><body>
-  
-
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
           
+          
+          <a href="index.html" class="icon icon-home">
+            ACACIA_S2S_TOOLKIT
+              <img src="_static/acacia_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Core</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#upgrading-the-package">Upgrading the Package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#necessary-requirements">Necessary requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#saving-ecmwf-data-store-credentials">Saving ECMWF Data Store credentials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#installing-ecmwf-client-libraries">Installing ECMWF client libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#additional-package-dependencies">Additional package dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quick-checklist">Quick checklist</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#further-information">Further information</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="download_forecasts.html">Downloading operational forecasts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="download_reforecast.html">Downloading operational reforecasts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/deterministic_forecast_example.html">Deterministic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/bias_correction_example.html">Bias correction example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/postprocessing_basic_example.html">Basic example</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Other</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tips_faq.html">Tips</a></li>
+</ul>
 
-          <div class="body" role="main">
-            
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ACACIA_S2S_TOOLKIT</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Getting started</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/Installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
   <section id="getting-started">
-<h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h1>
+<h1>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
 <p>This is a tool being developed by the ACACIA project. Please email feedback to <a class="reference external" href="mailto:joshua&#46;talib&#37;&#52;&#48;ecmwf&#46;int">joshua<span>&#46;</span>talib<span>&#64;</span>ecmwf<span>&#46;</span>int</a>.</p>
 </div>
 <section id="installation">
-<span id="id1"></span><h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<span id="id1"></span><h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
 <p>To use the <strong>acacia_s2s_toolkit</strong>, you will first need to have <a class="reference external" href="https://www.python.org/downloads/">Python 3</a> installed.</p>
 <p>You can then install the package using <code class="docutils literal notranslate"><span class="pre">pip</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pip install acacia_s2s_toolkit</span>
@@ -50,7 +115,7 @@
 </div>
 </section>
 <section id="upgrading-the-package">
-<h2>Upgrading the Package<a class="headerlink" href="#upgrading-the-package" title="Link to this heading">¶</a></h2>
+<h2>Upgrading the Package<a class="headerlink" href="#upgrading-the-package" title="Link to this heading"></a></h2>
 <p>To upgrade to the latest version, run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>acacia_s2s_toolkit
 </pre></div>
@@ -61,9 +126,9 @@
 </div>
 </section>
 <section id="necessary-requirements">
-<h2>Necessary requirements<a class="headerlink" href="#necessary-requirements" title="Link to this heading">¶</a></h2>
+<h2>Necessary requirements<a class="headerlink" href="#necessary-requirements" title="Link to this heading"></a></h2>
 <section id="saving-ecmwf-data-store-credentials">
-<h3>Saving ECMWF Data Store credentials<a class="headerlink" href="#saving-ecmwf-data-store-credentials" title="Link to this heading">¶</a></h3>
+<h3>Saving ECMWF Data Store credentials<a class="headerlink" href="#saving-ecmwf-data-store-credentials" title="Link to this heading"></a></h3>
 <p>At the time of writing, sub-seasonal forecast data from <a class="reference external" href="https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview">WWRP/WCRP’s S2S database</a> is made available through ECMWF’s Data Store. To download data from the ECMWF Data Store, you need to configure your CDS API key.</p>
 <p>After registering for an ECMWF account, your API credentials can be found on the following <a class="reference external" href="https://ecds.ecmwf.int/how-to-api">API setup page</a>.</p>
 <p>For the acacia_s2s_toolkit, please save these credentials to your home directory as a file named <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc.ecds</span></code>.</p>
@@ -73,7 +138,7 @@
 </div>
 </section>
 <section id="installing-ecmwf-client-libraries">
-<h3>Installing ECMWF client libraries<a class="headerlink" href="#installing-ecmwf-client-libraries" title="Link to this heading">¶</a></h3>
+<h3>Installing ECMWF client libraries<a class="headerlink" href="#installing-ecmwf-client-libraries" title="Link to this heading"></a></h3>
 <p>Once your ECMWF webAPI credentials are saved, install the CDS API client using <code class="docutils literal notranslate"><span class="pre">pip</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pip install &quot;cdsapi&gt;=0.7.7&quot;</span>
 </pre></div>
@@ -81,7 +146,7 @@
 <p>This package provides the necessary client functions for accessing ECMWF data.</p>
 </section>
 <section id="additional-package-dependencies">
-<h3>Additional package dependencies<a class="headerlink" href="#additional-package-dependencies" title="Link to this heading">¶</a></h3>
+<h3>Additional package dependencies<a class="headerlink" href="#additional-package-dependencies" title="Link to this heading"></a></h3>
 <p>In addition to requiring “<em>cdsapi</em>”, this package depends on the following libraries:</p>
 <ul class="simple">
 <li><p><strong>numpy</strong> (version 1.23 or higher)</p></li>
@@ -103,7 +168,7 @@
 <p>Given the number of dependencies, we highly recommend using the <strong>acacia_s2s_toolkit</strong> with a dedicated virtual environment. Guidance on creating and managing environments can be found in the official documentation for both <a class="reference external" href="https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html">Conda</a> and <a class="reference external" href="https://www.anaconda.com/docs/getting-started/working-with-conda/environments">Anaconda</a>.</p>
 </section>
 <section id="quick-checklist">
-<h3>Quick checklist<a class="headerlink" href="#quick-checklist" title="Link to this heading">¶</a></h3>
+<h3>Quick checklist<a class="headerlink" href="#quick-checklist" title="Link to this heading"></a></h3>
 <p>Before attempting to download sub-seasonal forecast data using this python tool, please ensure you have performed the following steps:</p>
 <ol class="arabic simple">
 <li><p><a class="reference external" href="https://www.python.org/downloads/">Python 3</a> is installed</p></li>
@@ -113,94 +178,40 @@
 </section>
 </section>
 <section id="further-information">
-<h2>Further information<a class="headerlink" href="#further-information" title="Link to this heading">¶</a></h2>
+<h2>Further information<a class="headerlink" href="#further-information" title="Link to this heading"></a></h2>
 <p>For more details on setting up and using ECMWF Data Store, please visit <a class="reference external" href="https://confluence.ecmwf.int/display/DAC/Using+the+ECMWF+data+store+-+ECDS">using the ECMWF data store</a></p>
 </section>
 </section>
 
 
+           </div>
           </div>
-          
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to acacia_s2s_toolkit’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="download_forecasts.html" class="btn btn-neutral float-right" title="Downloading operational forecasts" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Joshua Talib + ACACIA contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="Main">
-        <div class="sphinxsidebarwrapper">
-            <p class="logo"><a href="index.html">
-              <img class="logo" src="_static/acacia_logo.png" alt="Logo of ACACIA_S2S_TOOLKIT"/>
-            </a></p>
-<h1 class="logo"><a href="index.html">ACACIA_S2S_TOOLKIT</a></h1>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
 
-
-
-
-
-
-
-
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
-<p class="caption" role="heading"><span class="caption-text">Core</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="download_forecasts.html">Downloading operational forecasts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="download_reforecast.html">Downloading operational reforecasts</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="notebooks/deterministic_forecast_example.html">Deterministic forecast example</a></li>
-<li class="toctree-l1"><a class="reference internal" href="notebooks/probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
-<li class="toctree-l1"><a class="reference internal" href="notebooks/bias_correction_example.html">Bias correction example</a></li>
-<li class="toctree-l1"><a class="reference internal" href="notebooks/postprocessing_basic_example.html">Basic example</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Other</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="api.html">API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tips_faq.html">Tips</a></li>
-</ul>
-
-<div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="index.html" title="previous chapter">Welcome to acacia_s2s_toolkit’s documentation!</a></li>
-      <li>Next: <a href="download_forecasts.html" title="next chapter">Downloading operational forecasts</a></li>
-  </ul></li>
-</ul>
-</div>
-
-
-
-
-
-
-
-
-        </div>
-      </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="footer">
-      &#169;2025, Joshua Talib + ACACIA contributors.
-      
-      |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
-      
-      |
-      <a href="_sources/Installation.rst.txt"
-          rel="nofollow">Page source</a>
-    </div>
-
-    
-
-    
-  </body>
+</body>
 </html>

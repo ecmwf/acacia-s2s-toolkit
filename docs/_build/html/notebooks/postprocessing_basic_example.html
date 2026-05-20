@@ -1,44 +1,105 @@
+
+
 <!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<html lang="en" data-content_root="../">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic example &mdash; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
 
-    <title>Basic example &#8212; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
-    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
-    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="API" href="../api.html" />
-    <link rel="prev" title="Bias correction example" href="bias_correction_example.html" />
-   
-  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
-  
+    <link rel="prev" title="Bias correction example" href="bias_correction_example.html" /> 
+</head>
 
-  
-  
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
 
-  </head><body>
-  
-
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
           
+          
+          <a href="../index.html" class="icon icon-home">
+            ACACIA_S2S_TOOLKIT
+              <img src="../_static/acacia_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Core</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_forecasts.html">Downloading operational forecasts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_reforecast.html">Downloading operational reforecasts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="deterministic_forecast_example.html">Deterministic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bias_correction_example.html">Bias correction example</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic example</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses">OverviewThis illustratres use of postprocessing functions to transform downloaded forecast data and observed data into structure enabling simultaneous analyses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#getting-some-example-data-to-work-with">Getting some example data to work with</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#defining-parameters-for-postprocessing">Defining parameters for postprocessing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-the-postprocessing-function">Running the postprocessing function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#structure-of-transformed-data">Structure of transformed data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aligning-forecast-and-observed-spatial-grids">Aligning forecast and observed spatial grids</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Other</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tips_faq.html">Tips</a></li>
+</ul>
 
-          <div class="body" role="main">
-            
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">ACACIA_S2S_TOOLKIT</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Basic example</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/notebooks/postprocessing_basic_example.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
   <section id="basic-example">
-<h1>Basic example<a class="headerlink" href="#basic-example" title="Link to this heading">¶</a></h1>
+<h1>Basic example<a class="headerlink" href="#basic-example" title="Link to this heading"></a></h1>
 <section id="overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses">
-<h2>OverviewThis illustratres use of postprocessing functions to transform downloaded forecast data and observed data into structure enabling simultaneous analyses<a class="headerlink" href="#overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses" title="Link to this heading">¶</a></h2>
+<h2>OverviewThis illustratres use of postprocessing functions to transform downloaded forecast data and observed data into structure enabling simultaneous analyses<a class="headerlink" href="#overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
@@ -161,7 +222,7 @@ Notes
 </div>
 </section>
 <section id="getting-some-example-data-to-work-with">
-<h2>Getting some example data to work with<a class="headerlink" href="#getting-some-example-data-to-work-with" title="Link to this heading">¶</a></h2>
+<h2>Getting some example data to work with<a class="headerlink" href="#getting-some-example-data-to-work-with" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#this is the data directory - you can change it as it suits you</span>
@@ -192,7 +253,7 @@ file already exists locally ./data/madagascar.geojson
 </div>
 </section>
 <section id="defining-parameters-for-postprocessing">
-<h2>Defining parameters for postprocessing<a class="headerlink" href="#defining-parameters-for-postprocessing" title="Link to this heading">¶</a></h2>
+<h2>Defining parameters for postprocessing<a class="headerlink" href="#defining-parameters-for-postprocessing" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># defining what you want to process - i.e. forecast date, domain and observed dataset</span>
@@ -245,7 +306,7 @@ file already exists locally ./data/madagascar.geojson
 </div>
 </section>
 <section id="running-the-postprocessing-function">
-<h2>Running the postprocessing function<a class="headerlink" href="#running-the-postprocessing-function" title="Link to this heading">¶</a></h2>
+<h2>Running the postprocessing function<a class="headerlink" href="#running-the-postprocessing-function" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># calling the preprocessing function</span>
@@ -430,7 +491,7 @@ postprocessing done
 </div>
 </section>
 <section id="structure-of-transformed-data">
-<h2>Structure of transformed data<a class="headerlink" href="#structure-of-transformed-data" title="Link to this heading">¶</a></h2>
+<h2>Structure of transformed data<a class="headerlink" href="#structure-of-transformed-data" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># to illustrate difference between the raw data and the transformed data, let&#39;s load the raw data first</span>
@@ -511,7 +572,7 @@ processed observations (&#39;init_date&#39;, &#39;lead_time&#39;, &#39;lat&#39;,
 In the above example, the argument was “fine_to_coarse”, which resulted in observations data grid (fine) to be resampled to the forecast data grid (coarse). This is illustrated in figures below.</p>
 </section>
 <section id="aligning-forecast-and-observed-spatial-grids">
-<h2>Aligning forecast and observed spatial grids<a class="headerlink" href="#aligning-forecast-and-observed-spatial-grids" title="Link to this heading">¶</a></h2>
+<h2>Aligning forecast and observed spatial grids<a class="headerlink" href="#aligning-forecast-and-observed-spatial-grids" title="Link to this heading"></a></h2>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#To illustrate how the spatial grids are aligned let&#39;s plot data </span>
@@ -724,88 +785,34 @@ postprocessing done
 </section>
 
 
+           </div>
           </div>
-          
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="bias_correction_example.html" class="btn btn-neutral float-left" title="Bias correction example" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../api.html" class="btn btn-neutral float-right" title="API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Joshua Talib + ACACIA contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="Main">
-        <div class="sphinxsidebarwrapper">
-            <p class="logo"><a href="../index.html">
-              <img class="logo" src="../_static/acacia_logo.png" alt="Logo of ACACIA_S2S_TOOLKIT"/>
-            </a></p>
-<h1 class="logo"><a href="../index.html">ACACIA_S2S_TOOLKIT</a></h1>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
 
-
-
-
-
-
-
-
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
-<p class="caption" role="heading"><span class="caption-text">Core</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../Installation.html">Getting started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../download_forecasts.html">Downloading operational forecasts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../download_reforecast.html">Downloading operational reforecasts</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="deterministic_forecast_example.html">Deterministic forecast example</a></li>
-<li class="toctree-l1"><a class="reference internal" href="probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
-<li class="toctree-l1"><a class="reference internal" href="bias_correction_example.html">Bias correction example</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic example</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Other</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../api.html">API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tips_faq.html">Tips</a></li>
-</ul>
-
-<div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="bias_correction_example.html" title="previous chapter">Bias correction example</a></li>
-      <li>Next: <a href="../api.html" title="next chapter">API</a></li>
-  </ul></li>
-</ul>
-</div>
-
-
-
-
-
-
-
-
-        </div>
-      </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="footer">
-      &#169;2025, Joshua Talib + ACACIA contributors.
-      
-      |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
-      
-      |
-      <a href="../_sources/notebooks/postprocessing_basic_example.ipynb.txt"
-          rel="nofollow">Page source</a>
-    </div>
-
-    
-
-    
-  </body>
+</body>
 </html>
