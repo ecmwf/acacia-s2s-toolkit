@@ -7,6 +7,9 @@ import geopandas as gpd
 import numpy as np
 from cartopy.io.shapereader import natural_earth
 
+# this is for sphinx - only functions listed here will have entries in readthedocs API
+__all__ = ["download_hindcast"]
+
 class SuppressOutput:
     """Context manager to silence stdout/stderr (for ECMWF WebAPI logs)."""
     def __enter__(self):
