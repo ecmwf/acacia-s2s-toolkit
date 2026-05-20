@@ -14,6 +14,7 @@ release = '1.0'
 version = '1.1.4'
 
 # -- General configuration
+html_theme = "sphinx_rtd_theme"
 
 extensions = [
     'sphinx.ext.duration',
