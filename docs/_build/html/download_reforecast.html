@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Downloading operational reforecasts &#8212; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Deterministic forecast example" href="notebooks/deterministic_forecast_example.html" />
+    <link rel="prev" title="Downloading operational forecasts" href="download_forecasts.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="downloading-operational-reforecasts">
+<h1>Downloading operational reforecasts<a class="headerlink" href="#downloading-operational-reforecasts" title="Link to this heading">¶</a></h1>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>This is a tool being developed by the ACACIA project. Please email feedback to <a class="reference external" href="mailto:joshua&#46;talib&#37;&#52;&#48;ecmwf&#46;int">joshua<span>&#46;</span>talib<span>&#64;</span>ecmwf<span>&#46;</span>int</a>.</p>
+</div>
+<section id="download-a-collection-of-reforecasts">
+<h2>Download a collection of reforecasts<a class="headerlink" href="#download-a-collection-of-reforecasts" title="Link to this heading">¶</a></h2>
+<p>To download a selection of reforecasts from ECMWF’s S2S database, you will need to use the <cite>download_hindcast</cite> function from the <cite>download_hindcast.py</cite> python module. To begin with, it is recommended that you download ECMWF reforecast data first to get used to the system.</p>
+<p>To import the necessary function, use the following line of python code:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">acacia_s2s_toolkit.download_hindcast</span><span class="w"> </span><span class="kn">import</span> <span class="n">download_hindcast</span>
+</pre></div>
+</div>
+<p>After this, use the <cite>download_hindcast</cite> function to download operational reforecasts:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">download_hindcast</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">fcdate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plevs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">country_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">region_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bbox_bounds</span><span class="o">=</span><span class="p">[</span><span class="mi">90</span><span class="p">,</span> <span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">180</span><span class="p">],</span> <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data_save_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data_format</span><span class="o">=</span><span class="s2">&quot;netcdf&quot;</span><span class="p">,</span> <span class="n">grid</span><span class="o">=</span><span class="s2">&quot;1.5/1.5&quot;</span><span class="p">,</span> <span class="n">leadtime_hour</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rf_years</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rf_enslags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fc_time</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This function retrieves operational reforecast (hindcast) data for a specified model and variable from the S2S database. It supports downloading multiple initialization years and ensemble lags for a given forecasting system.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Necessary parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<ul class="simple">
+<li><p><strong>model</strong> (<em>str</em>): The forecasting model. The full list of supported models is avaliable on the <a class="reference external" href="https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html">download_forecasts</a> webpage.</p></li>
+<li><p><strong>variable</strong> (<em>str</em>): The forecasted variable to download. Use variable abbreviations listed on <a class="reference external" href="https://confluence.ecmwf.int/display/S2S/Parameters">ECMWF’s S2S parameter page</a>.</p></li>
+</ul>
+<p>Each variable must be requested separately.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Optional parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Parameters including <strong>fcdate</strong>, <strong>plevs</strong>, <strong>location_name</strong>, <strong>bbox_bounds</strong>, <strong>filename</strong>, <strong>data_save_dir</strong>, <strong>data_format</strong>, <strong>grid</strong>, <strong>leadtime_hour</strong>, <strong>overwrite</strong> and <strong>verbose</strong> are described in detail on the <a class="reference external" href="https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html">download_forecasts</a> webpage. Additional parameters specific to reforecast downloads include:</p>
+<ul class="simple">
+<li><p><strong>rf_years</strong> (<em>list of int</em>, optional): List of years to download reforecasts for. For example, [2000, 2001, 2002] will retrieve all reforecasts initialised between 2000 and 2002. Please note, due to changes when transferring to ECMWF Climate Data Store, all rf_years will be downloaded between the minimum and maximum of requested rf_years.</p></li>
+<li><p><strong>rf_enslags</strong> (<em>list of int</em>, optional): List of lagged ensemble members (in days) relative to the forecast initialization date. Default values depend on the selected model; see the following <a class="reference external" href="https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems">confluence page</a> for details.</p></li>
+<li><p><strong>fc_time</strong> (<em>bool</em>, default <code class="docutils literal notranslate"><span class="pre">True</span></code>): <strong>Option in development</strong> If <code class="docutils literal notranslate"><span class="pre">True</span></code>, shifts all lagged ensemble members so their forecast times are aligned to a common initialization date (useful for ensemble averaging). If False, preserves each member’s original valid time (useful for forecast validation).</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path to the downloaded file as a string.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For simplicity, all ensemble members are downloaded in a single request. Currently, the control and perturbed reforecasts are concatenated into one file after download.</p>
+</div>
+<p>You can check the status of your webAPI downloads on the following <a class="reference external" href="https://apps.ecmwf.int/webmars/joblist/">page</a>.</p>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading">¶</a></h2>
+<p>To be developed.</p>
+</section>
+<section id="explanations-of-certain-options">
+<h2>Explanations of certain options<a class="headerlink" href="#explanations-of-certain-options" title="Link to this heading">¶</a></h2>
+<section id="rf-enslags-reforecast-lagged-ensemble-capability">
+<h3>rf_enslags (reforecast lagged ensemble capability)<a class="headerlink" href="#rf-enslags-reforecast-lagged-ensemble-capability" title="Link to this heading">¶</a></h3>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/acacia_logo.png" alt="Logo of ACACIA_S2S_TOOLKIT"/>
+            </a></p>
+<h1 class="logo"><a href="index.html">ACACIA_S2S_TOOLKIT</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="Installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="download_forecasts.html">Downloading operational forecasts</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Downloading operational reforecasts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/deterministic_forecast_example.html">Deterministic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/bias_correction_example.html">Bias correction example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks/postprocessing_basic_example.html">Basic example</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Other</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tips_faq.html">Tips</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="download_forecasts.html" title="previous chapter">Downloading operational forecasts</a></li>
+      <li>Next: <a href="notebooks/deterministic_forecast_example.html" title="next chapter">Deterministic forecast example</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Joshua Talib + ACACIA contributors.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/download_reforecast.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

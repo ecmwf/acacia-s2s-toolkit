@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Basic example &#8212; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tips" href="../tips_faq.html" />
+    <link rel="prev" title="Bias correction example" href="bias_correction_example.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="basic-example">
+<h1>Basic example<a class="headerlink" href="#basic-example" title="Link to this heading">¶</a></h1>
+<section id="overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses">
+<h2>OverviewThis illustratres use of postprocessing functions to transform downloaded forecast data and observed data into structure enabling simultaneous analyses<a class="headerlink" href="#overviewthis-illustratres-use-of-postprocessing-functions-to-transform-downloaded-forecast-data-and-observed-data-into-structure-enabling-simultaneous-analyses" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cartopy.crs</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ccrs</span>
+<span class="c1">#import datetime</span>
+<span class="c1">#import os,sys,glob</span>
+<span class="c1">#import xesmf as xe</span>
+<span class="c1">#import warnings</span>
+<span class="c1">#warnings.filterwarnings(&quot;ignore&quot;, category=RuntimeWarning)</span>
+<span class="c1">#import pooch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">acacia_s2s_toolkit.postprocess</span><span class="w"> </span><span class="kn">import</span> <span class="n">postprocess_forecast</span><span class="p">,</span> <span class="n">get_example_data</span><span class="p">,</span> <span class="n">load_raw_data</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># let&#39;s see what the preprocess function does</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">postprocess_forecast</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>End-to-end postprocessing pipeline for forecast, hindcast, and observations.
+
+This function performs all postprocessing steps required to prepare
+forecast, hindcast, and observational datasets for verification or
+downstream analysis. The workflow includes:
+
+1. Reading forecast, hindcast, and observation NetCDF files.
+2. Converting accumulated variables to daily totals (when required).
+3. Spatial grid alignment between model data and observations.
+4. Temporal alignment of observations with hindcast structure.
+5. Reshaping datasets into a lead-time oriented format.
+6. Temporal aggregation over user-defined windows (e.g. 5-day, 7-day).
+
+The output datasets share a consistent structure that allows direct
+comparison between hindcasts, forecasts, and observations.
+
+Parameters
+----------
+nominal_date : str or datetime-like
+    Nominal initialization date of the forecast. Used to identify
+    the forecast and hindcast files and to align hindcasts with the
+    forecast cycle.
+
+download_dir : str
+    Directory containing forecast and hindcast NetCDF files.
+
+target_domain : str
+    Spatial domain identifier used in the input filenames.
+
+fcst_model : str
+    Forecast model name (e.g., &quot;ECMWF&quot;).
+
+fcst_var : str
+    Forecast variable name in the NetCDF files.
+
+agg_window : int
+    Length of the temporal aggregation window in days
+    (e.g., 1 for daily values, 5 for pentads, 7 for weekly).
+
+agg_method : {&quot;mean&quot;, &quot;sum&quot;}
+    Aggregation method applied within each aggregation window.
+
+obs_file : str
+    Path to the observation NetCDF file.
+
+obs_var : str
+    Variable name in the observation file.
+
+verbose : bool, default False
+    If True, enables logging output during postprocessing.
+
+time_alignment_kwargs : dict, optional
+    Additional keyword arguments passed to `align_time()`.
+
+grid_alignment_kwargs : dict, optional
+    Additional keyword arguments passed to `align_grid()`.
+
+
+Returns
+-------
+hindcast_leadtime_window_aggregate : xarray.DataArray 
+    Hindcast data reshaped into lead-time structure with dimensions:
+
+    (lead_time, init_date, member, lat, lon)
+
+    and aggregated over the requested temporal window.
+
+forecast_leadtime_window_aggregate : xarray.DataArray
+    Forecast data in the same lead-time structure as hindcasts.
+
+obs_leadtime_window_aggregate : xarray.DataArray
+    Observations aligned with hindcast cycles and reshaped into
+    lead-time structure. The member dimension is removed:
+
+    (lead_time, init_date, lat, lon)
+
+Notes
+-----
+* ECMWF precipitation (`tp`) is provided as running accumulation and
+  is automatically converted to daily totals.
+
+* Spatial alignment ensures that forecast and hindcast data are
+  restricted to grid cells where observations are available.
+
+* Temporal alignment duplicates the hindcast time structure for
+  observations, enabling direct comparison across lead times.
+
+* Lead-time restructuring allows analysis of aggregated forecast
+  periods such as weekly or pentad averages/totals.
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="getting-some-example-data-to-work-with">
+<h2>Getting some example data to work with<a class="headerlink" href="#getting-some-example-data-to-work-with" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#this is the data directory - you can change it as it suits you</span>
+<span class="n">data_dir</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span>
+
+<span class="c1"># this will load example data used in this notebook</span>
+<span class="c1"># data are available at https://web.csag.uct.ac.za:~wolski/acacia/toolkit/</span>
+<span class="c1"># comment this line if you want to work with your own data - </span>
+<span class="c1"># you will then have to define a file with observational data, and have </span>
+<span class="c1"># forecast and hindcast data for given initialization date downloaded to</span>
+<span class="c1"># the data_dir</span>
+
+<span class="n">get_example_data</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>file already exists locally ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+file already exists locally ./data/tp_ECMWF_20260301_madagascar_hc.nc
+file already exists locally ./data/tp_ECMWF_20260301_madagascar_fc.nc
+file already exists locally ./data/madagascar.geojson
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>True
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="defining-parameters-for-postprocessing">
+<h2>Defining parameters for postprocessing<a class="headerlink" href="#defining-parameters-for-postprocessing" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># defining what you want to process - i.e. forecast date, domain and observed dataset</span>
+
+<span class="c1"># nominal forecast date is defined here. </span>
+<span class="c1"># This notebook uses example data for this date only</span>
+<span class="c1"># example data are downloaded by a function get_example_data() called above</span>
+
+<span class="n">nominal_date</span><span class="o">=</span><span class="s2">&quot;2026-03-01&quot;</span>
+<span class="c1">#target domain</span>
+<span class="n">target_domain</span><span class="o">=</span><span class="s2">&quot;madagascar&quot;</span>
+<span class="c1">#forecast variable</span>
+<span class="n">fcst_var</span><span class="o">=</span><span class="s2">&quot;tp&quot;</span>
+<span class="c1">#foreast model</span>
+<span class="n">fcst_model</span><span class="o">=</span><span class="s2">&quot;ECMWF&quot;</span>
+
+<span class="c1">#this is file with observational data. It is gridded and covers the period of Jan 1981-March 2026</span>
+<span class="n">obs_file</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_dir</span><span class="si">}</span><span class="s2">/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc&quot;</span>
+
+<span class="c1">#we have to provide the name of the variable stored in the obs_file</span>
+<span class="n">obs_var</span><span class="o">=</span><span class="s2">&quot;PRCPTOT&quot;</span>
+
+<span class="c1"># this is a file with vector data showing the boundaries of the domain - will be used in plotting only</span>
+<span class="n">domain_shape_file</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_dir</span><span class="si">}</span><span class="s2">/madagascar.geojson&quot;</span>
+
+<span class="c1"># data will be aggregated into blocks of this size - &quot;5D&quot; is a Pandas expression of temporal base and stands for 5 days</span>
+<span class="c1"># if you want differently sized blocks - just change it into, say &quot;7D&quot;</span>
+<span class="n">agg_window</span><span class="o">=</span><span class="s2">&quot;5D&quot;</span>
+
+<span class="c1">#and this defines how data will be aggreagated over the block - in this case it will be a sum of daily values</span>
+<span class="n">agg_method</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span>
+
+<span class="c1"># this defines regridding parameters for matching the obs and forecast grids. </span>
+<span class="c1"># it assumes obs grid is finer, so fine_to_coarse will give forecast grid, coarse_to_fine will give obs grid</span>
+<span class="c1"># raise_if_missing will stop processing if the spatial overlap between obs and forecast grids of less than fractional </span>
+<span class="c1"># threshold</span>
+<span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+    <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;fine_to_coarse&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;conservative&quot;</span><span class="p">,</span>
+    <span class="n">raise_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.9</span>
+<span class="p">)</span>
+
+<span class="c1"># this defines time alignment parameter for matching the obs and hindcast time series. </span>
+<span class="c1"># raise_if_missing will stop processing if any of the hindcast days are not covered by observations </span>
+<span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;raise_if_missing&quot;</span><span class="p">:</span><span class="kc">True</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="running-the-postprocessing-function">
+<h2>Running the postprocessing function<a class="headerlink" href="#running-the-postprocessing-function" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># calling the preprocessing function</span>
+<span class="c1"># the function returns three objects: transformed hindcast data, transformed hindcast data and transformed observations</span>
+<span class="c1"># we use _lt suffix here, which stands for lead time - as the transformation gives a lead time-oriented structure of the data. </span>
+<span class="c1"># the details of this structure will be exlained below.</span>
+<span class="n">hindcast_lt</span><span class="p">,</span><span class="n">forecast_lt</span><span class="p">,</span><span class="n">obs_lt</span><span class="o">=</span><span class="n">postprocess_forecast</span><span class="p">(</span>
+    <span class="n">nominal_date</span><span class="o">=</span><span class="n">nominal_date</span><span class="p">,</span>
+    <span class="n">download_dir</span><span class="o">=</span><span class="n">data_dir</span><span class="p">,</span>
+    <span class="n">target_domain</span><span class="o">=</span><span class="n">target_domain</span><span class="p">,</span>
+    <span class="n">fcst_var</span><span class="o">=</span><span class="n">fcst_var</span><span class="p">,</span>
+    <span class="n">fcst_model</span><span class="o">=</span><span class="n">fcst_model</span><span class="p">,</span>
+    <span class="n">agg_window</span><span class="o">=</span><span class="n">agg_window</span><span class="p">,</span>
+    <span class="n">agg_method</span><span class="o">=</span><span class="n">agg_method</span><span class="p">,</span>
+    <span class="n">obs_file</span><span class="o">=</span><span class="n">obs_file</span><span class="p">,</span>
+    <span class="n">obs_var</span><span class="o">=</span><span class="n">obs_var</span><span class="p">,</span>
+    <span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="n">grid_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="n">time_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>logging is True
+logging is on
+nominal forecast date: 2026-03-01
+download dir: ./data
+domain: madagascar
+model: ECMWF
+forecast variable: tp
+aggregation window: 5D
+observed file: ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+observed variable: PRCPTOT
+
+============================================================
+==================== START: read_netcdf ====================
+============================================================
+
+reading tp from ./data/tp_ECMWF_20260301_madagascar_fc.nc
+success
+looking for tp
+found
+Harmonizing coordinates...
+Renaming coordinates: {&#39;latitude&#39;: &#39;lat&#39;, &#39;longitude&#39;: &#39;lon&#39;, &#39;time&#39;: &#39;time&#39;}
+check if data are daily...
+daily with data time range: 2026-03-02T00:00:00.000000000 to 2026-03-28T00:00:00.000000000
+all done
+
+============================================================
+
+
+============================================================
+==================== START: read_netcdf ====================
+============================================================
+
+reading tp from ./data/tp_ECMWF_20260301_madagascar_hc.nc
+success
+looking for tp
+found
+Harmonizing coordinates...
+Renaming coordinates: {&#39;latitude&#39;: &#39;lat&#39;, &#39;longitude&#39;: &#39;lon&#39;, &#39;time&#39;: &#39;time&#39;}
+check if data are daily...
+daily with data time range: 2006-03-02T00:00:00.000000000 to 2025-03-28T00:00:00.000000000
+all done
+
+============================================================
+
+
+============================================================
+==================== START: read_netcdf ====================
+============================================================
+
+reading PRCPTOT from ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+success
+looking for PRCPTOT
+found
+Harmonizing coordinates...
+Renaming coordinates: {&#39;time&#39;: &#39;time&#39;, &#39;lon&#39;: &#39;lon&#39;, &#39;lat&#39;: &#39;lat&#39;}
+check if data are daily...
+daily with data time range: 1981-01-01T12:00:00.000000000 to 2026-01-31T12:00:00.000000000
+all done
+
+============================================================
+
+here
+
+============================================================
+=============== START: accumulated_to_daily ================
+============================================================
+
+Selecting midnight accumulation values...
+Computing day-to-day differences...
+Detecting cycle starts...
+Replacing missing differences...
+Shifting timestamps to represent accumulation day...
+all done
+
+============================================================
+
+
+============================================================
+=============== START: accumulated_to_daily ================
+============================================================
+
+Selecting midnight accumulation values...
+Computing day-to-day differences...
+Detecting cycle starts...
+Replacing missing differences...
+Shifting timestamps to represent accumulation day...
+all done
+
+============================================================
+
+
+============================================================
+=================== START: align_spatial ===================
+============================================================
+
+Regridding coarsegrid → finegrid (bilinear )...
+done
+
+============================================================
+
+
+============================================================
+=================== START: align_spatial ===================
+============================================================
+
+Regridding coarsegrid → finegrid (bilinear )...
+done
+
+============================================================
+
+
+============================================================
+==================== START: align_time =====================
+============================================================
+
+Normalizing time coordinates...
+Selecting obs time coordinates matching hindcast...
+obs: 1981-01-01 to 2026-01-31
+hindcast: 2006-03-01 to 2025-03-27
+Time coverage verified: obs fully covers hindcast period.
+
+============================================================
+
+
+============================================================
+=============== START: organize_by_leadtime ================
+============================================================
+
+finding initialization date for each member
+Concatenating member blocks...
+Aggregating lead_time to 5D blocks (sum)...
+============================================================
+
+
+============================================================
+=============== START: organize_by_leadtime ================
+============================================================
+
+finding initialization date for each member
+Concatenating member blocks...
+Aggregating lead_time to 5D blocks (sum)...
+============================================================
+
+
+============================================================
+=============== START: organize_by_leadtime ================
+============================================================
+
+finding initialization date for each member
+Concatenating member blocks...
+Aggregating lead_time to 5D blocks (sum)...
+============================================================
+
+postprocessing done
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="structure-of-transformed-data">
+<h2>Structure of transformed data<a class="headerlink" href="#structure-of-transformed-data" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># to illustrate difference between the raw data and the transformed data, let&#39;s load the raw data first</span>
+<span class="c1"># the postprocessing package offers a function for this:</span>
+
+<span class="n">hindcast_raw</span><span class="p">,</span><span class="n">forecast_raw</span><span class="p">,</span><span class="n">obs_raw</span><span class="o">=</span><span class="n">load_raw_data</span><span class="p">(</span>
+    <span class="n">nominal_date</span><span class="o">=</span><span class="n">nominal_date</span><span class="p">,</span>
+    <span class="n">download_dir</span><span class="o">=</span><span class="n">data_dir</span><span class="p">,</span>
+    <span class="n">target_domain</span><span class="o">=</span><span class="n">target_domain</span><span class="p">,</span>
+    <span class="n">fcst_var</span><span class="o">=</span><span class="n">fcst_var</span><span class="p">,</span>
+    <span class="n">fcst_model</span><span class="o">=</span><span class="n">fcst_model</span><span class="p">,</span>
+    <span class="n">obs_file</span><span class="o">=</span><span class="n">obs_file</span><span class="p">,</span>
+    <span class="n">obs_var</span><span class="o">=</span><span class="n">obs_var</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>logging is False
+nominal forecast date: 2026-03-01
+download dir: ./data
+domain: madagascar
+model: ECMWF
+forecast variable: tp
+observed file: ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+observed variable: PRCPTOT
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#Now we can compare the raw and transformed datasets:</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;hindcast:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;raw hindcast&quot;</span><span class="p">,</span> <span class="n">hindcast_raw</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">hindcast_raw</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;processed hindcast&quot;</span><span class="p">,</span> <span class="n">hindcast_lt</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">hindcast_lt</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">forecast:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;raw forecast&quot;</span><span class="p">,</span> <span class="n">forecast_raw</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">forecast_raw</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;processed forecast&quot;</span><span class="p">,</span> <span class="n">forecast_lt</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">forecast_lt</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">observations:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;raw observations&quot;</span><span class="p">,</span> <span class="n">obs_raw</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">obs_raw</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;processed observations&quot;</span><span class="p">,</span> <span class="n">obs_lt</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="n">obs_lt</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>hindcast:
+raw hindcast (&#39;time&#39;, &#39;member&#39;, &#39;lat&#39;, &#39;lon&#39;) (540, 11, 10, 6)
+processed hindcast (&#39;init_date&#39;, &#39;member&#39;, &#39;lead_time&#39;, &#39;lat&#39;, &#39;lon&#39;) (20, 11, 5, 58, 36)
+
+forecast:
+raw forecast (&#39;time&#39;, &#39;member&#39;, &#39;lat&#39;, &#39;lon&#39;) (27, 101, 10, 6)
+processed forecast (&#39;init_date&#39;, &#39;member&#39;, &#39;lead_time&#39;, &#39;lat&#39;, &#39;lon&#39;) (1, 101, 5, 58, 36)
+
+observations:
+raw observations (&#39;time&#39;, &#39;lat&#39;, &#39;lon&#39;) (16467, 58, 36)
+processed observations (&#39;init_date&#39;, &#39;lead_time&#39;, &#39;lat&#39;, &#39;lon&#39;) (20, 5, 58, 36)
+</pre></div>
+</div>
+</div>
+</div>
+<p>What the postprocessing function does is the following for hindcast and forecast data</p>
+<ul class="simple">
+<li><p>it disaggregates the time dimension, which in raw data pools hindcasts (and separately forecasts) across the downloaded initiatlization times into two dimensions - initialization time (init_date) and lead time (lead_time).</p></li>
+<li><p>the size of init_date corresponds to the number of years in hindcast and forecast. Obviously - it is 1 for forecast.</p></li>
+<li><p>Note that in case you downloaded forecast or hindcasts with a number of rf_enslags or fc_enslags, the disaggregation into init_date is performed “by hindcast of forecast year”, i.e. all data initialized within a particular year will be pooled together under one init_date.</p></li>
+<li><p>the size of lead_time dimension corresponds to the number of temporal “blocks” fitting into the time series of the forecast data. With forecast run with lead time up to XX days, and the size of postprocessing “block” set to 5D - we get 5 lead time blocks</p></li>
+<li><p>data for each lead_time will be aggregated over its corresponding time base (so over day 1 to 5 for lead_time of 1, day 6 to 10 for lead_time of 2 etc.)</p></li>
+</ul>
+<p>For observations:</p>
+<ul class="simple">
+<li><p>the postprocessing function reorganizes the data into the same init_date and lead_time “blocks” as are derived for the hindcast. Obviously, observations are not available for the forecast period, so there is no observed data matching the forecast.</p></li>
+</ul>
+<p>Additionally, depending on the user-defined argument - direction - which is either “fine_to_coarse” or “coarse_to_fine”, the postprocessing function aligns the spatial grids of observations and forecast.
+In the above example, the argument was “fine_to_coarse”, which resulted in observations data grid (fine) to be resampled to the forecast data grid (coarse). This is illustrated in figures below.</p>
+</section>
+<section id="aligning-forecast-and-observed-spatial-grids">
+<h2>Aligning forecast and observed spatial grids<a class="headerlink" href="#aligning-forecast-and-observed-spatial-grids" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#To illustrate how the spatial grids are aligned let&#39;s plot data </span>
+
+<span class="c1">#first for the &quot;fine_to_coarse&quot;</span>
+<span class="c1"># we will reprocess the data to make sure we are doing things right</span>
+
+<span class="c1">#setting direction argument to &quot;fine_to_coarse&quot;</span>
+<span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+    <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;fine_to_coarse&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;conservative&quot;</span><span class="p">,</span>
+    <span class="n">raise_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.9</span>
+<span class="p">)</span>
+
+<span class="c1">#reprocessing data</span>
+<span class="n">hindcast_lt</span><span class="p">,</span><span class="n">forecast_lt</span><span class="p">,</span><span class="n">obs_lt</span><span class="o">=</span><span class="n">postprocess_forecast</span><span class="p">(</span>
+    <span class="n">nominal_date</span><span class="o">=</span><span class="n">nominal_date</span><span class="p">,</span>
+    <span class="n">download_dir</span><span class="o">=</span><span class="n">data_dir</span><span class="p">,</span>
+    <span class="n">target_domain</span><span class="o">=</span><span class="n">target_domain</span><span class="p">,</span>
+    <span class="n">fcst_var</span><span class="o">=</span><span class="n">fcst_var</span><span class="p">,</span>
+    <span class="n">fcst_model</span><span class="o">=</span><span class="n">fcst_model</span><span class="p">,</span>
+    <span class="n">agg_window</span><span class="o">=</span><span class="n">agg_window</span><span class="p">,</span>
+    <span class="n">agg_method</span><span class="o">=</span><span class="n">agg_method</span><span class="p">,</span>
+    <span class="n">obs_file</span><span class="o">=</span><span class="n">obs_file</span><span class="p">,</span>
+    <span class="n">obs_var</span><span class="o">=</span><span class="n">obs_var</span><span class="p">,</span>
+    <span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="n">grid_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="n">time_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1">#selecting a lead time for plotting</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">0</span>
+
+<span class="c1"># selecting data for this lead time</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">forecast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span>
+
+<span class="c1">#for obs and hindcast we get climatology for the given lead_time</span>
+<span class="n">obs</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#let&#39;s plot ensemble median</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">fcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span>
+<span class="c1">#obviously - observations are not an ensemble, so no need to do anything</span>
+
+
+<span class="c1">#plotting figure</span>
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+
+<span class="c1">#plotting forecast map</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">fcst</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;forecast&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="c1">#plotting hindcast map</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">hcst</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;hindcast climatology&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="c1"># plotting observed data</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">obs</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;observations climatology&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding colorbar</span>
+<span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_axes</span><span class="p">([</span><span class="mf">0.85</span><span class="p">,</span><span class="mf">0.2</span><span class="p">,</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">0.6</span><span class="p">])</span>
+<span class="n">cbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">cbar</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;mm&#39;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2"> lead time, </span><span class="si">{}</span><span class="s2">-day total rainfall</span><span class="se">\n</span><span class="s2"> regridding &#39;fine_to_coarse&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">lead_time</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">y</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>logging is False
+nominal forecast date: 2026-03-01
+download dir: ./data
+domain: madagascar
+model: ECMWF
+forecast variable: tp
+aggregation window: 5D
+observed file: ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+observed variable: PRCPTOT
+here
+postprocessing done
+</pre></div>
+</div>
+<img alt="../_images/f59a77353054c6b7be56610124c92a4791f8e82b73b0e99a8b3c1d4bffe7ab3a.png" src="../_images/f59a77353054c6b7be56610124c92a4791f8e82b73b0e99a8b3c1d4bffe7ab3a.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#Let&#39;s repeat this with &quot;coarse_to_fine&quot; </span>
+
+<span class="c1"># we will reprocess the data to make sure we are doing things right</span>
+
+<span class="c1">#setting direction argument to &quot;coarse_to_fine&quot;</span>
+<span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+    <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;coarse_to_fine&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;bilinear&quot;</span><span class="p">,</span>
+    <span class="n">raise_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.9</span>
+<span class="p">)</span>
+
+<span class="c1">#reprocessing data</span>
+<span class="n">hindcast_lt</span><span class="p">,</span><span class="n">forecast_lt</span><span class="p">,</span><span class="n">obs_lt</span><span class="o">=</span><span class="n">postprocess_forecast</span><span class="p">(</span>
+    <span class="n">nominal_date</span><span class="o">=</span><span class="n">nominal_date</span><span class="p">,</span>
+    <span class="n">download_dir</span><span class="o">=</span><span class="n">data_dir</span><span class="p">,</span>
+    <span class="n">target_domain</span><span class="o">=</span><span class="n">target_domain</span><span class="p">,</span>
+    <span class="n">fcst_var</span><span class="o">=</span><span class="n">fcst_var</span><span class="p">,</span>
+    <span class="n">fcst_model</span><span class="o">=</span><span class="n">fcst_model</span><span class="p">,</span>
+    <span class="n">agg_window</span><span class="o">=</span><span class="n">agg_window</span><span class="p">,</span>
+    <span class="n">agg_method</span><span class="o">=</span><span class="n">agg_method</span><span class="p">,</span>
+    <span class="n">obs_file</span><span class="o">=</span><span class="n">obs_file</span><span class="p">,</span>
+    <span class="n">obs_var</span><span class="o">=</span><span class="n">obs_var</span><span class="p">,</span>
+    <span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="n">grid_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="n">time_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1">#selecting a lead time for plotting</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">0</span>
+
+<span class="c1"># selecting data for this lead time</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">forecast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span>
+
+<span class="c1">#for obs and hindcast we get climatology for the given lead_time</span>
+<span class="n">obs</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#let&#39;s plot ensemble median</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">fcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span>
+<span class="c1">#obviously - observations are not an ensemble, so no need to do anything</span>
+
+
+<span class="c1">#plotting figure</span>
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+
+<span class="c1">#plotting forecast map</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">fcst</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;forecast&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="c1">#plotting hindcast map</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">hcst</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;hindcast climatology&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="c1"># plotting observed data</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+<span class="n">im</span><span class="o">=</span><span class="n">obs</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">70</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;observations climatology&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding colorbar</span>
+<span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_axes</span><span class="p">([</span><span class="mf">0.85</span><span class="p">,</span><span class="mf">0.2</span><span class="p">,</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">0.6</span><span class="p">])</span>
+<span class="n">cbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">cbar</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;mm&#39;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2"> lead time, </span><span class="si">{}</span><span class="s2">-day total rainfall</span><span class="se">\n</span><span class="s2"> regridding &#39;coarse_to_fine&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">lead_time</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">y</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>logging is False
+nominal forecast date: 2026-03-01
+download dir: ./data
+domain: madagascar
+model: ECMWF
+forecast variable: tp
+aggregation window: 5D
+observed file: ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+observed variable: PRCPTOT
+here
+postprocessing done
+</pre></div>
+</div>
+<img alt="../_images/e0964c0bd876573e8382778c9567c44b4a7333c28be8942fced61c50d963348e.png" src="../_images/e0964c0bd876573e8382778c9567c44b4a7333c28be8942fced61c50d963348e.png" />
+</div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/acacia_logo.png" alt="Logo of ACACIA_S2S_TOOLKIT"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">ACACIA_S2S_TOOLKIT</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_forecasts.html">Downloading operational forecasts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_reforecast.html">Downloading operational reforecasts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="deterministic_forecast_example.html">Deterministic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bias_correction_example.html">Bias correction example</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic example</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Other</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tips_faq.html">Tips</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="bias_correction_example.html" title="previous chapter">Bias correction example</a></li>
+      <li>Next: <a href="../tips_faq.html" title="next chapter">Tips</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Joshua Talib + ACACIA contributors.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/notebooks/postprocessing_basic_example.ipynb.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

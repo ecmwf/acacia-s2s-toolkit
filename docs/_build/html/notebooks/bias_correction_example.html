@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Bias correction example &#8212; ACACIA_S2S_TOOLKIT 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Basic example" href="postprocessing_basic_example.html" />
+    <link rel="prev" title="Probabilistic forecast example" href="probabilistic_forecast_example.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="bias-correction-example">
+<h1>Bias correction example<a class="headerlink" href="#bias-correction-example" title="Link to this heading">¶</a></h1>
+<section id="overviewthis-illustratres-use-of-bias-correction-functions-we-will-implement-two-bias-correction-approaches-currently-available-in-the-package">
+<h2>OverviewThis illustratres use of bias correction functions. We will implement two bias correction approaches currently available in the package:<a class="headerlink" href="#overviewthis-illustratres-use-of-bias-correction-functions-we-will-implement-two-bias-correction-approaches-currently-available-in-the-package" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>simple mean and variance adjustment</p></li>
+<li><p>simple quantile-quantile mapping
+Bias correction is implemented on the lead-time oriented structure of forecast data. So we will first postprocess the raw forecast to that format. We will subsequently implement bias correction using both approaches and then illustrate how bias is reduced using several plots.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cartopy.crs</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ccrs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">acacia_s2s_toolkit.postprocess</span><span class="w"> </span><span class="kn">import</span> <span class="n">postprocess_forecast</span><span class="p">,</span> <span class="n">get_example_data</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">acacia_s2s_toolkit.bias_correction</span><span class="w"> </span><span class="kn">import</span> <span class="n">biascorrection_simple_qqmapping</span><span class="p">,</span> <span class="n">biascorrection_meanvariance</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># let&#39;s see what the bias corection functions do</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">biascorrection_meanvariance</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Apply mean and variance bias correction to forecast and hindcast data.
+
+For each lead time, adjusts the mean and variance of the hindcast and
+forecast to match those of the observed data. The correction is computed
+from the hindcast/observation pair and then applied to both hindcast and
+forecast.
+
+Parameters
+----------
+forecast : xarray.DataArray
+    Forecast data with dimensions (lead_time, member, ...).
+hindcast : xarray.DataArray
+    Hindcast data with dimensions (lead_time, member, init_date, ...).
+observed : xarray.DataArray
+    Observed data with dimensions (lead_time, init_date, ...).
+
+Returns
+-------
+forecast_adjusted : xarray.DataArray
+    Bias-corrected forecast, same shape as input forecast.
+hindcast_adjusted : xarray.DataArray
+    Bias-corrected hindcast, same shape as input hindcast.
+
+Notes
+-----
+The correction follows:
+    adjusted = ((x - mean(x)) * sqrt(var(obs) / var(hindcast))) + mean(obs)
+
+Hindcast variance is computed (separately for each lead time, of course) over 
+both member and init_date dimensions.
+Grid points where hindcast variance is zero are masked (set to NaN) to
+avoid division by zero.
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># let&#39;s see what the bias corection functions do</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">biascorrection_simple_qqmapping</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Apply quantile-quantile mapping bias correction to forecast and hindcast data.
+
+For each lead time, maps the emiprical distribution of the hindcast and forecast
+to match the observed empirical distribution using quantile mapping. The transfer
+function is derived from the hindcast/observation pair and applied to
+both hindcast and forecast. This is simple quantile mapping based on emiprical      
+distributions and without extension of tails, and thus by nature bias-corrected forecast 
+maxima/minima will not exceed these in observations.   
+
+Parameters
+----------
+forecast : xarray.DataArray
+    Forecast data with dimensions (lead_time, lat, lon, init_date, member).
+hindcast : xarray.DataArray
+    Hindcast data with dimensions (lead_time, lat, lon, init_date, member).
+observed : xarray.DataArray
+    Observed data with dimensions (lead_time, lat, lon, init_date).
+
+Returns
+-------
+forecast_adjusted : xarray.DataArray
+    Bias-corrected forecast, same shape as input forecast.
+hindcast_adjusted : xarray.DataArray
+    Bias-corrected hindcast, same shape as input hindcast.
+
+Notes
+-----
+Member and init_date dimensions are stacked into a single sample dimension
+before applying the quantile mapping, to maximise the sample size used
+for estimating the transfer function.
+
+The core quantile mapping is performed by a function applied pointwise
+over lat/lon using `xr.apply_ufunc` with dask parallelization support.
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="getting-some-data-to-work-with">
+<h2>Getting some data to work with<a class="headerlink" href="#getting-some-data-to-work-with" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#this is the data directory - you can change it as it suits you</span>
+<span class="n">data_dir</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span>
+
+<span class="c1"># this will load example data used in this notebook</span>
+<span class="c1"># data are available at https://web.csag.uct.ac.za:~wolski/acacia/toolkit/</span>
+<span class="c1"># comment this line if you want to work with your own data - </span>
+<span class="c1"># you will then have to define a file with observational data, and have </span>
+<span class="c1"># forecast and hindcast data for given initialization date downloaded to</span>
+<span class="c1"># the data_dir</span>
+
+<span class="n">get_example_data</span><span class="p">(</span><span class="n">data_dir</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>file already exists locally ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+file already exists locally ./data/tp_ECMWF_20260301_madagascar_hc.nc
+file already exists locally ./data/tp_ECMWF_20260301_madagascar_fc.nc
+file already exists locally ./data/madagascar.geojson
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>True
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="defining-parameters-for-postprocessing">
+<h2>Defining parameters for postprocessing<a class="headerlink" href="#defining-parameters-for-postprocessing" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># defining what you want to process - i.e. forecast date, domain and observed dataset</span>
+
+<span class="c1"># nominal forecast date is defined here. </span>
+<span class="c1"># This notebook uses example data for this date only</span>
+<span class="c1"># example data are downloaded by a function get_example_data() called above</span>
+
+<span class="n">nominal_date</span><span class="o">=</span><span class="s2">&quot;2026-03-01&quot;</span>
+<span class="c1">#target domain</span>
+<span class="n">target_domain</span><span class="o">=</span><span class="s2">&quot;madagascar&quot;</span>
+<span class="c1">#forecast variable</span>
+<span class="n">fcst_var</span><span class="o">=</span><span class="s2">&quot;tp&quot;</span>
+<span class="c1">#foreast model</span>
+<span class="n">fcst_model</span><span class="o">=</span><span class="s2">&quot;ECMWF&quot;</span>
+
+<span class="c1">#this is file with observational data. It is gridded and covers the period of Jan 1981-March 2026</span>
+<span class="n">obs_file</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_dir</span><span class="si">}</span><span class="s2">/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc&quot;</span>
+
+<span class="c1">#we have to provide the name of the variable stored in the obs_file</span>
+<span class="n">obs_var</span><span class="o">=</span><span class="s2">&quot;PRCPTOT&quot;</span>
+
+<span class="c1"># this is a file with vector data showing the boundaries of the domain - will be used in plotting only</span>
+<span class="n">domain_shape_file</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_dir</span><span class="si">}</span><span class="s2">/madagascar.geojson&quot;</span>
+
+<span class="c1"># data will be aggregated into blocks of this size - &quot;5D&quot; is a Pandas expression of temporal base and stands for 5 days</span>
+<span class="c1"># if you want differently sized blocks - just change it into, say &quot;7D&quot;</span>
+<span class="n">agg_window</span><span class="o">=</span><span class="s2">&quot;5D&quot;</span>
+
+<span class="c1">#and this defines how data will be aggreagated over the block - in this case it will be a sum of daily values</span>
+<span class="n">agg_method</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span>
+
+<span class="c1"># this defines regridding parameters for matching the obs and forecast grids. </span>
+<span class="c1"># it assumes obs grid is finer, so fine_to_coarse will give forecast grid, coarse_to_fine will give obs grid</span>
+<span class="c1"># raise_if_missing will stop processing if the spatial overlap between obs and forecast grids of less than fractional </span>
+<span class="c1"># threshold</span>
+<span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+    <span class="n">direction</span><span class="o">=</span><span class="s2">&quot;fine_to_coarse&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;conservative&quot;</span><span class="p">,</span>
+    <span class="n">raise_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">0.9</span>
+<span class="p">)</span>
+
+<span class="c1"># this defines time alignment parameter for matching the obs and hindcast time series. </span>
+<span class="c1"># raise_if_missing will stop processing if any of the hindcast days are not covered by observations </span>
+<span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;raise_if_missing&quot;</span><span class="p">:</span><span class="kc">True</span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="implementing-postprocessing">
+<h2>Implementing postprocessing<a class="headerlink" href="#implementing-postprocessing" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># calling the preprocessing wrapper</span>
+<span class="n">hindcast_lt</span><span class="p">,</span><span class="n">forecast_lt</span><span class="p">,</span><span class="n">obs_lt</span><span class="o">=</span><span class="n">postprocess_forecast</span><span class="p">(</span>
+    <span class="n">nominal_date</span><span class="o">=</span><span class="n">nominal_date</span><span class="p">,</span>
+    <span class="n">download_dir</span><span class="o">=</span><span class="n">data_dir</span><span class="p">,</span>
+    <span class="n">target_domain</span><span class="o">=</span><span class="n">target_domain</span><span class="p">,</span>
+    <span class="n">fcst_var</span><span class="o">=</span><span class="n">fcst_var</span><span class="p">,</span>
+    <span class="n">fcst_model</span><span class="o">=</span><span class="n">fcst_model</span><span class="p">,</span>
+    <span class="n">agg_window</span><span class="o">=</span><span class="n">agg_window</span><span class="p">,</span>
+    <span class="n">agg_method</span><span class="o">=</span><span class="n">agg_method</span><span class="p">,</span>
+    <span class="n">obs_file</span><span class="o">=</span><span class="n">obs_file</span><span class="p">,</span>
+    <span class="n">obs_var</span><span class="o">=</span><span class="n">obs_var</span><span class="p">,</span>
+    <span class="n">grid_alignment_kwargs</span><span class="o">=</span><span class="n">grid_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">time_alignment_kwargs</span><span class="o">=</span><span class="n">time_alignment_kwargs</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>logging is False
+nominal forecast date: 2026-03-01
+download dir: ./data
+domain: madagascar
+model: ECMWF
+forecast variable: tp
+aggregation window: 5D
+observed file: ./data/PRCPTOT_day_CHC_CHIRPS-2.0-0p25_merged.nc
+observed variable: PRCPTOT
+postprocessing done
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="implementing-bias-correction-mean-and-variance-approach">
+<h2>Implementing bias correction - ‘mean and variance’ approach<a class="headerlink" href="#implementing-bias-correction-mean-and-variance-approach" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#applying the mean and variance bias correction</span>
+<span class="n">forecast_bc_mv</span><span class="p">,</span><span class="n">hindcast_bc_mv</span><span class="o">=</span><span class="n">biascorrection_meanvariance</span><span class="p">(</span><span class="n">forecast_lt</span><span class="p">,</span> <span class="n">hindcast_lt</span><span class="p">,</span> <span class="n">obs_lt</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="let-s-evaluate-the-efficacy-of-bias-correction">
+<h3>Let’s evaluate the efficacy of bias correction<a class="headerlink" href="#let-s-evaluate-the-efficacy-of-bias-correction" title="Link to this heading">¶</a></h3>
+<p>For this we will calculate bias in mean in original data, and residual bias in the bias-corrected data.
+Bias in mean is considered here to be a difference between the long-term mean of hindcasts, with data pooled across all members and all initiatlization times (but not lead times, as bias is lead-time specific) and long term mean of observations.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#calculating long term mean in obs</span>
+<span class="n">ob_clim</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+
+<span class="c1"># same for hindcast</span>
+<span class="n">hc_clim</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="s2">&quot;member&quot;</span><span class="p">,</span> <span class="s2">&quot;init_date&quot;</span><span class="p">])</span>
+
+<span class="c1"># same for bias corrected hindcast</span>
+<span class="n">hc_clim_bc</span><span class="o">=</span><span class="n">hindcast_bc_mv</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="s2">&quot;member&quot;</span><span class="p">,</span> <span class="s2">&quot;init_date&quot;</span><span class="p">])</span>
+
+<span class="c1">#calculating bias as percentage of obs value</span>
+<span class="n">bias</span><span class="o">=</span><span class="p">((</span><span class="n">ob_clim</span><span class="o">-</span><span class="n">hc_clim</span><span class="p">)</span><span class="o">/</span><span class="n">ob_clim</span><span class="p">)</span><span class="o">*</span><span class="mi">100</span>
+
+<span class="c1">#residual bias in bias corrected data</span>
+<span class="n">resid_bias</span><span class="o">=</span><span class="p">((</span><span class="n">ob_clim</span><span class="o">-</span><span class="n">hc_clim_bc</span><span class="p">)</span><span class="o">/</span><span class="n">ob_clim</span><span class="p">)</span><span class="o">*</span><span class="mi">100</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># plotting bias and residual bias</span>
+
+<span class="c1">#plotting for a selected lead time</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">1</span>
+
+
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+
+
+<span class="c1"># plotting bias in original data</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+
+<span class="c1">#plotting</span>
+<span class="n">im</span><span class="o">=</span><span class="n">bias</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">40</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">BrBG</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Deterministic bias&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#plotting residual bias in bias-corrected data</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+
+<span class="c1">#plotting</span>
+<span class="n">im</span><span class="o">=</span><span class="n">resid_bias</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">40</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">BrBG</span><span class="p">)</span>
+
+<span class="c1">#adding colorbar</span>
+<span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_axes</span><span class="p">([</span><span class="mf">0.86</span><span class="p">,</span><span class="mf">0.2</span><span class="p">,</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">0.6</span><span class="p">])</span>
+<span class="n">cbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">cbar</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Residual bias&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.85</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2"> lead time, </span><span class="si">{}</span><span class="s2">-day total rainfall</span><span class="se">\n</span><span class="s2">Bias correction using simple &#39;mean and variance&#39; approach&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">lead_time</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/cdbf6f6be55c1fd0ef142e7158498eb73bd9fa97f4becc51fab5853dba4b9961.png" src="../_images/cdbf6f6be55c1fd0ef142e7158498eb73bd9fa97f4becc51fab5853dba4b9961.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="implementing-bias-correction-simple-quantile-quantile-mapping-approach">
+<h2>Implementing bias correction - simple quantile-quantile mapping approach<a class="headerlink" href="#implementing-bias-correction-simple-quantile-quantile-mapping-approach" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#now let&#39;s try with the quantile mapping approach</span>
+<span class="n">forecast_bc_qq</span><span class="p">,</span><span class="n">hindcast_bc_qq</span><span class="o">=</span><span class="n">biascorrection_simple_qqmapping</span><span class="p">(</span><span class="n">forecast_lt</span><span class="p">,</span> <span class="n">hindcast_lt</span><span class="p">,</span> <span class="n">obs_lt</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="id1">
+<h3>Let’s evaluate the efficacy of bias correction<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># calculating bias in mean in original data, and residual bias in bias-corrected data </span>
+
+<span class="c1">#calculating long term mean in obs and hindcast</span>
+<span class="n">ob_clim</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;init_date&quot;</span><span class="p">)</span>
+
+<span class="c1"># same for hindcast</span>
+<span class="n">hc_clim</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="s2">&quot;member&quot;</span><span class="p">,</span> <span class="s2">&quot;init_date&quot;</span><span class="p">])</span>
+
+<span class="c1"># same for bias corrected hindcast</span>
+<span class="n">hc_clim_bc</span><span class="o">=</span><span class="n">hindcast_bc_qq</span><span class="o">.</span><span class="n">mean</span><span class="p">([</span><span class="s2">&quot;member&quot;</span><span class="p">,</span> <span class="s2">&quot;init_date&quot;</span><span class="p">])</span>
+
+<span class="c1">#calculating bias as percentage of obs value</span>
+<span class="n">bias</span><span class="o">=</span><span class="p">((</span><span class="n">ob_clim</span><span class="o">-</span><span class="n">hc_clim</span><span class="p">)</span><span class="o">/</span><span class="n">ob_clim</span><span class="p">)</span><span class="o">*</span><span class="mi">100</span>
+
+<span class="c1">#residual bias in bias corrected data</span>
+<span class="n">resid_bias</span><span class="o">=</span><span class="p">((</span><span class="n">ob_clim</span><span class="o">-</span><span class="n">hc_clim_bc</span><span class="p">)</span><span class="o">/</span><span class="n">ob_clim</span><span class="p">)</span><span class="o">*</span><span class="mi">100</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># plotting bias and residual bias</span>
+
+<span class="c1">#plotting for a selected lead time</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">4</span>
+
+
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+
+
+<span class="c1"># plotting bias in original data</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+
+<span class="c1">#plotting</span>
+<span class="n">im</span><span class="o">=</span><span class="n">bias</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">40</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">BrBG</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Deterministic bias&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#plotting residual bias in bias-corrected data</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">())</span>
+
+<span class="c1">#plotting</span>
+<span class="n">im</span><span class="o">=</span><span class="n">resid_bias</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">add_colorbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">40</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">BrBG</span><span class="p">)</span>
+
+<span class="c1">#adding colorbar</span>
+<span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_axes</span><span class="p">([</span><span class="mf">0.86</span><span class="p">,</span><span class="mf">0.2</span><span class="p">,</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">0.6</span><span class="p">])</span>
+<span class="n">cbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">cbar</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+
+<span class="c1">#adding overlay</span>
+<span class="n">overlay</span><span class="o">=</span><span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">domain_shape_file</span><span class="p">)</span>
+<span class="n">overlay</span><span class="o">.</span><span class="n">boundary</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">pl</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Residual bias&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.85</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2"> lead time, </span><span class="si">{}</span><span class="s2">-day total rainfall</span><span class="se">\n</span><span class="s2">Bias correction using simple quantile mapping approach&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">lead_time</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/6321f80407471d0d85a92f8902199affac35ec2b3503ae5c48220071206a520b.png" src="../_images/6321f80407471d0d85a92f8902199affac35ec2b3503ae5c48220071206a520b.png" />
+</div>
+</div>
+<p>As the above figures show, the ‘mean and variance’ approach produces basically no residual bias. Which is expected, as the procedure makes sure that the mean of hindcasts is exactly the same as mean of observations.</p>
+<p>Quantile mapping, however, produces a small residual bias, but one has to consider that there is a difference between mean and median, and the qq bias correction adjusts for median of the distribution rathe than for mean, while the biascorrection_meanvariance function adjusts mean explicitly.</p>
+</section>
+</section>
+<section id="comparing-distributions">
+<h2>Comparing distributions<a class="headerlink" href="#comparing-distributions" title="Link to this heading">¶</a></h2>
+<p>We can illustrate the effects of bias correction and differences between the two methods using distributions</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># plotting distributions in original and bias-corrected data</span>
+
+<span class="c1">#selecting lead time</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">1</span>
+
+<span class="c1">#selecting a location</span>
+<span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=-</span><span class="mi">18</span><span class="p">,</span><span class="mf">47.5</span>
+
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+
+<span class="c1"># plotting distribution in original data and in data corrected with mean and variance approach</span>
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># extracting data for the selected location and lead time</span>
+<span class="n">ob</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+<span class="n">hc</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+<span class="n">hc_bc_mv</span><span class="o">=</span><span class="n">hindcast_bc_mv</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting cumulative distribution functions - empirical ones, of course</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">ob</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">hc</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;unadjusted hindcast&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">hc_bc_mv</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast bias-corrected (MV)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding some labels</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;ECDF in </span><span class="se">\n</span><span class="s2">mean-variance bias correction&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">([</span><span class="s2">&quot;probability [-]&quot;</span><span class="p">])</span>
+
+
+
+<span class="c1">#plotting distribution in original data and in data corrected using simple quantile mapping approach</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1">#extracting data for the selected location and leadtime</span>
+<span class="n">hc_bc_qq</span><span class="o">=</span><span class="n">hindcast_bc_qq</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">)</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting ecdfs</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">ob</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">hc</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;unadjusted hindcast&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">ecdf</span><span class="p">(</span><span class="n">hc_bc_qq</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast bias-corrected (QQ)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">)</span>
+
+<span class="c1">#adding labels</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;ECDF in </span><span class="se">\n</span><span class="s2">quantile-quantile bias correction&quot;</span><span class="p">)</span>
+
+<span class="c1">#finishing off</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2"> lead time, </span><span class="si">{}</span><span class="s2">-day total rainfall</span><span class="se">\n</span><span class="s2">at </span><span class="si">{}</span><span class="s2"> lat, </span><span class="si">{}</span><span class="s2"> lon&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">lead_time</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="p">(</span><span class="mf">1.05</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.85</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/a136789e2fcb462ae5d61c2ccc12f10e78814c48790b502dac536ed032219078.png" src="../_images/a136789e2fcb462ae5d61c2ccc12f10e78814c48790b502dac536ed032219078.png" />
+</div>
+</div>
+</section>
+<section id="illustrating-effects-of-bias-correction-in-time-series-of-hindcast-and-forecast-data">
+<h2>Illustrating effects of bias correction in time series of hindcast and forecast data<a class="headerlink" href="#illustrating-effects-of-bias-correction-in-time-series-of-hindcast-and-forecast-data" title="Link to this heading">¶</a></h2>
+<p>The effect of bias correction can also be shown in the time series of forecasts. This has to be done for a particular location and lead time.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#Let&#39;s plot original, unadjusted hindcast and forecast first</span>
+
+<span class="c1"># here we will use a location</span>
+<span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="o">=-</span><span class="mi">19</span><span class="p">,</span><span class="mf">47.5</span>
+
+<span class="c1">#we will plot it for a selected lead time</span>
+<span class="n">lead_time</span><span class="o">=</span><span class="mi">0</span>
+
+<span class="c1"># we use unadjusted forecast</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hindcast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">forecast_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+<span class="c1">#and observations in the lead-time oriented format</span>
+<span class="n">obs</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#now plotting</span>
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1">#plotting hincasts - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">hcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">hcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1">#and hindcast median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span> <span class="n">hcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast ensemble median&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting forecast - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">fcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">cont</span><span class="o">=</span><span class="kc">True</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1"># and forecast median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;forecast ensemble median&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting observations</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">obs</span><span class="p">,</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;observed&quot;</span><span class="p">)</span>
+
+<span class="c1">#we can add long term mean - for hindcast</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">)</span>
+
+<span class="c1">#and for observations</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;obs long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1">#finishing off</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="s2"> day total rainfall&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;year&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;rainfall total [mm]&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/4d7575a625ad6d266936958e083e1609fccbab5c59170cde2921e2a24dfd4f1d.png" src="../_images/4d7575a625ad6d266936958e083e1609fccbab5c59170cde2921e2a24dfd4f1d.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># now the same thing for bias-corrected hindcast and forecast</span>
+
+<span class="c1"># we use bias corrected forecast</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hindcast_bc_mv</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">forecast_bc_mv</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+<span class="c1">#and observations in the lead-time oriented format</span>
+<span class="n">obs</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#now plotting</span>
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1">#plotting hincasts - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">hcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">hcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1">#and hindcast median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span> <span class="n">hcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast ensemble median&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#plotting forecast - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">fcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">cont</span><span class="o">=</span><span class="kc">True</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;forecast ensemble median&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting observations</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">obs</span><span class="p">,</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;observed&quot;</span><span class="p">)</span>
+
+<span class="c1">#we can add long term median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;obs long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="s2"> day total rainfall</span><span class="se">\n</span><span class="s2"> bias-corrected using simple &#39;mean and variance&#39; approach&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.05</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;year&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;rainfall total [mm]&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/3fba6b62dd7a04e3b4c1883cbd61aecde540a131dafb906d758ac5c757026411.png" src="../_images/3fba6b62dd7a04e3b4c1883cbd61aecde540a131dafb906d758ac5c757026411.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># now the same thing for bias-corrected hindcast and forecast - simple quantile mapping approach</span>
+
+<span class="c1"># we use bias corrected forecast</span>
+<span class="n">hcst</span><span class="o">=</span><span class="n">hindcast_bc_qq</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+<span class="n">fcst</span><span class="o">=</span><span class="n">forecast_bc_qq</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+<span class="c1">#and observations in the lead-time oriented format</span>
+<span class="n">obs</span><span class="o">=</span><span class="n">obs_lt</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">lat</span><span class="o">=</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="o">=</span><span class="n">lon</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#now plotting</span>
+<span class="n">fig</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+
+<span class="n">pl</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1">#plotting hincasts - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">hcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">hcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1">#and hindcast median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span> <span class="n">hcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast ensemble median&quot;</span><span class="p">)</span>
+
+
+<span class="c1">#plotting forecast - individual members</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">fcst</span><span class="o">.</span><span class="n">member</span><span class="p">:</span>
+    <span class="n">cont</span><span class="o">=</span><span class="kc">True</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">member</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fcst</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">fcst</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">),</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">ms</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;forecast ensemble median&quot;</span><span class="p">)</span>
+
+<span class="c1">#plotting observations</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">init_date</span><span class="p">,</span><span class="n">obs</span><span class="p">,</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;observed&quot;</span><span class="p">)</span>
+
+<span class="c1">#we can add long term median</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">hcst</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="s2">&quot;member&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;hindcast long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;green&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">obs</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;obs long-term mean&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Forecast issued on </span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="s2"> day total rainfall</span><span class="se">\n</span><span class="s2"> bias-corrected using simple quantile mapping approach&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nominal_date</span><span class="p">,</span> <span class="n">agg_window</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.05</span><span class="p">)</span>
+
+<span class="n">pl</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;year&quot;</span><span class="p">)</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;rainfall total [mm]&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/15d20a9694143edef396ad58f12c3bca1c6163fd9cfb695d5f1a2e9d6cc03bb7.png" src="../_images/15d20a9694143edef396ad58f12c3bca1c6163fd9cfb695d5f1a2e9d6cc03bb7.png" />
+</div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/acacia_logo.png" alt="Logo of ACACIA_S2S_TOOLKIT"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">ACACIA_S2S_TOOLKIT</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Installation.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_forecasts.html">Downloading operational forecasts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../download_reforecast.html">Downloading operational reforecasts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example notebooks</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="deterministic_forecast_example.html">Deterministic forecast example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic_forecast_example.html">Probabilistic forecast example</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Bias correction example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="postprocessing_basic_example.html">Basic example</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Other</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tips_faq.html">Tips</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="probabilistic_forecast_example.html" title="previous chapter">Probabilistic forecast example</a></li>
+      <li>Next: <a href="postprocessing_basic_example.html" title="next chapter">Basic example</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Joshua Talib + ACACIA contributors.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/notebooks/bias_correction_example.ipynb.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
