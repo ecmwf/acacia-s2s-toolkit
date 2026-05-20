@@ -15,8 +15,8 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=f2a433a1"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -129,12 +129,12 @@
 <h2>Necessary requirements<a class="headerlink" href="#necessary-requirements" title="Link to this heading"></a></h2>
 <section id="saving-ecmwf-data-store-credentials">
 <h3>Saving ECMWF Data Store credentials<a class="headerlink" href="#saving-ecmwf-data-store-credentials" title="Link to this heading"></a></h3>
-<p>At the time of writing, sub-seasonal forecast data from <a class="reference external" href="https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview">WWRP/WCRP’s S2S database</a> is made available through ECMWF’s Data Store. To download data from the ECMWF Data Store, you need to configure your CDS API key.</p>
-<p>After registering for an ECMWF account, your API credentials can be found on the following <a class="reference external" href="https://ecds.ecmwf.int/how-to-api">API setup page</a>.</p>
+<p>At the time of writing, sub-seasonal forecast data from <a class="reference external" href="https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview">ECMWF’s S2S database</a> is made available through ECMWF’s Data Store. To download data from the ECMWF Data Store, you need to configure your CDS API key.</p>
+<p>After registering for an ECMWF account, your API credentials can be found <a class="reference external" href="https://ecds.ecmwf.int/how-to-api">here</a>.</p>
 <p>For the acacia_s2s_toolkit, please save these credentials to your home directory as a file named <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc.ecds</span></code>.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p>Please note, credentials should be saved in a file called <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc.ecds</span></code> and not the default <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc</span></code>. This is to avoid confusion with API credentials needed to access data on ECMWF Climate Data Store (i.e. for ERA5 data).</p>
+<p>Please note that the credentials should be saved in a file called <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc.ecds</span></code> and not the default <code class="docutils literal notranslate"><span class="pre">~/.cdsapirc</span></code>. This is to avoid confusion with API credentials accessing ECMWF Climate Data Store (i.e. for ERA5 data).</p>
 </div>
 </section>
 <section id="installing-ecmwf-client-libraries">

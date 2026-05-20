@@ -1,11 +1,11 @@
 Downloading operational reforecasts
-=====
+===================================
 
 .. important::
     This is a tool being developed by the ACACIA project. Please email feedback to joshua.talib@ecmwf.int.
 
 Download a collection of reforecasts
------------
+------------------------------------
 
 To download a selection of reforecasts from ECMWF's S2S database, you will need to use the `download_hindcast` function from the `download_hindcast.py` python module. To begin with, it is recommended that you download ECMWF reforecast data first to get used to the system. 
 
@@ -31,7 +31,7 @@ This function retrieves operational reforecast (hindcast) data for a specified m
 
 .. note::
 
-Each variable must be requested separately.
+   Each variable must be requested separately.
 
 :Optional parameters:
 
@@ -53,13 +53,13 @@ Parameters including **fcdate**, **plevs**, **location_name**, **bbox_bounds**, 
 You can check the status of your webAPI downloads on the following `page <https://apps.ecmwf.int/webmars/joblist/>`_. 
 
 Examples
-------------
+--------
 To be developed.
 
 
 Explanations of certain options
--------------
+-------------------------------
 
 rf_enslags (reforecast lagged ensemble capability)
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -15,8 +15,8 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=f2a433a1"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -60,7 +60,17 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Other</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.download_forecast.download_forecast"><code class="docutils literal notranslate"><span class="pre">download_forecast()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.download_hindcast.download_hindcast"><code class="docutils literal notranslate"><span class="pre">download_hindcast()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.download_S2Stc_tracks.download_forecast_TCtracks"><code class="docutils literal notranslate"><span class="pre">download_forecast_TCtracks()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.download_S2Stc_tracks.download_reforecast_TCtracks"><code class="docutils literal notranslate"><span class="pre">download_reforecast_TCtracks()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.postprocess.get_example_data"><code class="docutils literal notranslate"><span class="pre">get_example_data()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.postprocess.load_raw_data"><code class="docutils literal notranslate"><span class="pre">load_raw_data()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.postprocess.postprocess_forecast"><code class="docutils literal notranslate"><span class="pre">postprocess_forecast()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#acacia_s2s_toolkit.bias_correction.biascorrection_meanvariance"><code class="docutils literal notranslate"><span class="pre">biascorrection_meanvariance()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="tips_faq.html">Tips</a></li>
 </ul>
 
@@ -90,6 +100,321 @@
              
   <section id="module-acacia_s2s_toolkit">
 <span id="api"></span><h1>API<a class="headerlink" href="#module-acacia_s2s_toolkit" title="Link to this heading"></a></h1>
+<dl class="py function" id="module-acacia_s2s_toolkit.download_forecast">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.download_forecast.download_forecast">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.download_forecast.</span></span><span class="sig-name descname"><span class="pre">download_forecast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcdate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plevs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">country_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox_bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[90,</span> <span class="pre">-180,</span> <span class="pre">-90,</span> <span class="pre">180]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_save_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'netcdf'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'1.5x1.5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">leadtime_hour</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc_enslags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.download_forecast.download_forecast" title="Link to this definition"></a></dt>
+<dd><p>Overarching function that will download forecast data from ECDS.</p>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>model<span class="classifier">str</span></dt><dd><p>Forecast model name.</p>
+</dd>
+<dt>variable<span class="classifier">str</span></dt><dd><p>Variable to download.</p>
+</dd>
+<dt>fcdate<span class="classifier">str, optional</span></dt><dd><p>Forecast initialization date in YYYYMMDD format. If None, today’s UTC
+date is used and rolled back until a valid forecast date is found.</p>
+</dd>
+<dt>plevs<span class="classifier">int or list[int], optional</span></dt><dd><p>Pressure level(s), where applicable.</p>
+</dd>
+<dt>country_name<span class="classifier">str, optional</span></dt><dd><p>Country name used to derive bounds automatically from Natural Earth
+country polygons. If provided, this overrides both region_name and
+bbox_bounds.</p>
+</dd>
+<dt>region_name<span class="classifier">str, optional</span></dt><dd><p>Predefined domain name. If provided, this overrides bbox_bounds unless
+country_name is also provided.</p>
+</dd>
+<dt>bbox_bounds<span class="classifier">list[float]</span></dt><dd><p>Bounding box in the form [north, west, south, east].</p>
+</dd>
+<dt>filename<span class="classifier">str, optional</span></dt><dd><p>Output filename without or with extension.</p>
+</dd>
+<dt>data_save_dir<span class="classifier">str, optional</span></dt><dd><p>Directory where the downloaded file will be saved.</p>
+</dd>
+<dt>data_format<span class="classifier">str</span></dt><dd><p>Output format, e.g. “netcdf” or “grib”.</p>
+</dd>
+<dt>grid<span class="classifier">str</span></dt><dd><p>Grid resolution as “dlonxdlat”, e.g. “1.5x1.5”.</p>
+</dd>
+<dt>leadtime_hour<span class="classifier">optional</span></dt><dd><p>Forecast lead hours passed to downstream request logic.</p>
+</dd>
+<dt>fc_enslags<span class="classifier">optional</span></dt><dd><p>Forecast ensemble lag selection passed to downstream request logic.</p>
+</dd>
+<dt>overwrite<span class="classifier">bool</span></dt><dd><p>If False and file exists already, skip the download.</p>
+</dd>
+<dt>verbose<span class="classifier">bool</span></dt><dd><p>If True, print diagnostic information.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h2>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>str</dt><dd><p>Path to the saved file.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function" id="module-acacia_s2s_toolkit.download_hindcast">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.download_hindcast.download_hindcast">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.download_hindcast.</span></span><span class="sig-name descname"><span class="pre">download_hindcast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcdate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plevs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">country_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox_bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[90,</span> <span class="pre">-180,</span> <span class="pre">-90,</span> <span class="pre">180]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_save_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'netcdf'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'1.5x1.5'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">leadtime_hour</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_years</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_enslags</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.download_hindcast.download_hindcast" title="Link to this definition"></a></dt>
+<dd><p>Overarching function that will download hindcast data from ECDS.</p>
+<section id="id1">
+<h2>Parameters<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>model<span class="classifier">str</span></dt><dd><p>Forecast model name.</p>
+</dd>
+<dt>variable<span class="classifier">str</span></dt><dd><p>Variable to download.</p>
+</dd>
+<dt>fcdate<span class="classifier">str, optional</span></dt><dd><p>Forecast initialization date in YYYYMMDD format. If None, today’s UTC
+date is used and rolled back until a valid forecast date is found.</p>
+</dd>
+<dt>plevs<span class="classifier">int or list[int], optional</span></dt><dd><p>Pressure level(s), where applicable.</p>
+</dd>
+<dt>country_name<span class="classifier">str, optional</span></dt><dd><p>Country name used to derive bounds automatically from Natural Earth
+country polygons. If provided, this overrides both region_name and
+bbox_bounds.</p>
+</dd>
+<dt>region_name<span class="classifier">str, optional</span></dt><dd><p>Predefined domain name. If provided, this overrides bbox_bounds unless
+country_name is also provided.</p>
+</dd>
+<dt>bbox_bounds<span class="classifier">list[float]</span></dt><dd><p>Bounding box in the form [north, west, south, east].</p>
+</dd>
+<dt>filename<span class="classifier">str, optional</span></dt><dd><p>Output filename without or with extension.</p>
+</dd>
+<dt>data_save_dir<span class="classifier">str, optional</span></dt><dd><p>Directory where the downloaded file will be saved.</p>
+</dd>
+<dt>data_format<span class="classifier">str</span></dt><dd><p>Output format, e.g. “netcdf” or “grib”.</p>
+</dd>
+<dt>grid<span class="classifier">str</span></dt><dd><p>Grid resolution as “dlonxdlat”, e.g. “1.5x1.5”.</p>
+</dd>
+<dt>leadtime_hour<span class="classifier">optional</span></dt><dd><p>Forecast lead hours passed to downstream request logic.</p>
+</dd>
+<dt>rf_years<span class="classifier">optional</span></dt><dd><p>Hindcast years passed to downstream request logic.</p>
+</dd>
+<dt>rf_enslags<span class="classifier">optional</span></dt><dd><p>Hindcast ensemble lag selection passed to downstream request logic.</p>
+</dd>
+<dt>fc_time<span class="classifier">bool</span></dt><dd><p>Passed to hindcast request logic.</p>
+</dd>
+<dt>overwrite<span class="classifier">bool</span></dt><dd><p>If False and file exists already, skip the download.</p>
+</dd>
+<dt>verbose<span class="classifier">bool</span></dt><dd><p>If True, print diagnostic information.</p>
+</dd>
+</dl>
+</section>
+<section id="id2">
+<h2>Returns<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>str</dt><dd><p>Path to the saved file (or intended saved file base, depending on
+downstream request behaviour).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function" id="module-acacia_s2s_toolkit.download_S2Stc_tracks">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.download_S2Stc_tracks.download_forecast_TCtracks">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.download_S2Stc_tracks.</span></span><span class="sig-name descname"><span class="pre">download_forecast_TCtracks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fcdate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">leadtime_hour</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename_save</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc_enslags</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.download_S2Stc_tracks.download_forecast_TCtracks" title="Link to this definition"></a></dt>
+<dd><p>need to do something with leadtime_hour parameter</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.download_S2Stc_tracks.download_reforecast_TCtracks">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.download_S2Stc_tracks.</span></span><span class="sig-name descname"><span class="pre">download_reforecast_TCtracks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fcdate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">leadtime_hour</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename_save</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_enslags</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_years</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fc_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.download_S2Stc_tracks.download_reforecast_TCtracks" title="Link to this definition"></a></dt>
+<dd><p>Downloads tracked TCs within reforecasts</p>
+</dd></dl>
+
+<dl class="py function" id="module-acacia_s2s_toolkit.postprocess">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.postprocess.get_example_data">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.postprocess.</span></span><span class="sig-name descname"><span class="pre">get_example_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.postprocess.get_example_data" title="Link to this definition"></a></dt>
+<dd><p>Download example datasets for toolkit-extension.</p>
+<p>Downloads observation, hindcast, forecast, and domain GeoJSON files
+from remote storage to a local directory. Files are verified against
+known checksums. Skips downloading files that already exist locally.</p>
+<dl>
+<dt>Args:</dt><dd><dl class="simple">
+<dt>data_dir (str): Path to the local directory where files will be</dt><dd><p>saved. Created automatically if it does not exist.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>bool: True if all files are available locally.</p>
+</dd>
+<dt>Raises:</dt><dd><p>OSError: If the directory cannot be created.</p>
+</dd>
+<dt>Example:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">toolkit_extension</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">te</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">te</span><span class="o">.</span><span class="n">get_example_data</span><span class="p">(</span><span class="s2">&quot;./data&quot;</span><span class="p">)</span>
+<span class="go">downloading obs file</span>
+<span class="go">downloading hindcast file</span>
+<span class="go">downloading forecast file</span>
+<span class="go">downloading domain_geojson file</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.postprocess.load_raw_data">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.postprocess.</span></span><span class="sig-name descname"><span class="pre">load_raw_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nominal_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">download_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcst_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcst_var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs_var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.postprocess.load_raw_data" title="Link to this definition"></a></dt>
+<dd><p>reading raw forecast, hindcast, and observations.</p>
+<p>This function reads forecast, hindcast, and observation NetCDF files.</p>
+<section id="id3">
+<h2>Parameters<a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>nominal_date<span class="classifier">str or datetime-like</span></dt><dd><p>Nominal initialization date of the forecast. Used to identify
+the forecast and hindcast files and to align hindcasts with the
+forecast cycle.</p>
+</dd>
+<dt>download_dir<span class="classifier">str</span></dt><dd><p>Directory containing forecast and hindcast NetCDF files.</p>
+</dd>
+<dt>target_domain<span class="classifier">str</span></dt><dd><p>Spatial domain identifier used in the input filenames.</p>
+</dd>
+<dt>fcst_model<span class="classifier">str</span></dt><dd><p>Forecast model name (e.g., “ECMWF”).</p>
+</dd>
+<dt>fcst_var<span class="classifier">str</span></dt><dd><p>Forecast variable name in the NetCDF files.</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h2>Returns<a class="headerlink" href="#id4" title="Link to this heading"></a></h2>
+<dl>
+<dt>hindcast<span class="classifier">xarray.DataArray </span></dt><dd><p>Hindcast data in original structure with dimensions:</p>
+<p>(lead_time, init_date, member, lat, lon)</p>
+</dd>
+<dt>forecast<span class="classifier">xarray.DataArray</span></dt><dd><p>Forecast data in original structure.</p>
+</dd>
+<dt>obs<span class="classifier">xarray.DataArray</span></dt><dd><p>Observations data in original structure</p>
+<p>(date, lat, lon)</p>
+</dd>
+</dl>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>ECMWF precipitation (<cite>tp</cite>) is provided as running accumulation and
+is automatically converted to daily totals.</p></li>
+</ul>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.postprocess.postprocess_forecast">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.postprocess.</span></span><span class="sig-name descname"><span class="pre">postprocess_forecast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nominal_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">download_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcst_model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fcst_var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">agg_window</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">agg_method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs_var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_alignment_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_alignment_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.postprocess.postprocess_forecast" title="Link to this definition"></a></dt>
+<dd><p>End-to-end postprocessing pipeline for forecast, hindcast, and observations.</p>
+<p>This function performs all postprocessing steps required to prepare
+forecast, hindcast, and observational datasets for verification or
+downstream analysis. The workflow includes:</p>
+<ol class="arabic simple">
+<li><p>Reading forecast, hindcast, and observation NetCDF files.</p></li>
+<li><p>Converting accumulated variables to daily totals (when required).</p></li>
+<li><p>Spatial grid alignment between model data and observations.</p></li>
+<li><p>Temporal alignment of observations with hindcast structure.</p></li>
+<li><p>Reshaping datasets into a lead-time oriented format.</p></li>
+<li><p>Temporal aggregation over user-defined windows (e.g. 5-day, 7-day).</p></li>
+</ol>
+<p>The output datasets share a consistent structure that allows direct
+comparison between hindcasts, forecasts, and observations.</p>
+<section id="id5">
+<h2>Parameters<a class="headerlink" href="#id5" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>nominal_date<span class="classifier">str or datetime-like</span></dt><dd><p>Nominal initialization date of the forecast. Used to identify
+the forecast and hindcast files and to align hindcasts with the
+forecast cycle.</p>
+</dd>
+<dt>download_dir<span class="classifier">str</span></dt><dd><p>Directory containing forecast and hindcast NetCDF files.</p>
+</dd>
+<dt>target_domain<span class="classifier">str</span></dt><dd><p>Spatial domain identifier used in the input filenames.</p>
+</dd>
+<dt>fcst_model<span class="classifier">str</span></dt><dd><p>Forecast model name (e.g., “ECMWF”).</p>
+</dd>
+<dt>fcst_var<span class="classifier">str</span></dt><dd><p>Forecast variable name in the NetCDF files.</p>
+</dd>
+<dt>agg_window<span class="classifier">int</span></dt><dd><p>Length of the temporal aggregation window in days
+(e.g., 1 for daily values, 5 for pentads, 7 for weekly).</p>
+</dd>
+<dt>agg_method<span class="classifier">{“mean”, “sum”}</span></dt><dd><p>Aggregation method applied within each aggregation window.</p>
+</dd>
+<dt>obs_file<span class="classifier">str</span></dt><dd><p>Path to the observation NetCDF file.</p>
+</dd>
+<dt>obs_var<span class="classifier">str</span></dt><dd><p>Variable name in the observation file.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, default False</span></dt><dd><p>If True, enables logging output during postprocessing.</p>
+</dd>
+<dt>time_alignment_kwargs<span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments passed to <cite>align_time()</cite>.</p>
+</dd>
+<dt>grid_alignment_kwargs<span class="classifier">dict, optional</span></dt><dd><p>Additional keyword arguments passed to <cite>align_grid()</cite>.</p>
+</dd>
+</dl>
+</section>
+<section id="id6">
+<h2>Returns<a class="headerlink" href="#id6" title="Link to this heading"></a></h2>
+<dl>
+<dt>hindcast_leadtime_window_aggregate<span class="classifier">xarray.DataArray </span></dt><dd><p>Hindcast data reshaped into lead-time structure with dimensions:</p>
+<p>(lead_time, init_date, member, lat, lon)</p>
+<p>and aggregated over the requested temporal window.</p>
+</dd>
+<dt>forecast_leadtime_window_aggregate<span class="classifier">xarray.DataArray</span></dt><dd><p>Forecast data in the same lead-time structure as hindcasts.</p>
+</dd>
+<dt>obs_leadtime_window_aggregate<span class="classifier">xarray.DataArray</span></dt><dd><p>Observations aligned with hindcast cycles and reshaped into
+lead-time structure. The member dimension is removed:</p>
+<p>(lead_time, init_date, lat, lon)</p>
+</dd>
+</dl>
+</section>
+<section id="id7">
+<h2>Notes<a class="headerlink" href="#id7" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>ECMWF precipitation (<cite>tp</cite>) is provided as running accumulation and
+is automatically converted to daily totals.</p></li>
+<li><p>Spatial alignment ensures that forecast and hindcast data are
+restricted to grid cells where observations are available.</p></li>
+<li><p>Temporal alignment duplicates the hindcast time structure for
+observations, enabling direct comparison across lead times.</p></li>
+<li><p>Lead-time restructuring allows analysis of aggregated forecast
+periods such as weekly or pentad averages/totals.</p></li>
+</ul>
+</section>
+</dd></dl>
+
+<dl class="py function" id="module-acacia_s2s_toolkit.bias_correction">
+<dt class="sig sig-object py" id="acacia_s2s_toolkit.bias_correction.biascorrection_meanvariance">
+<span class="sig-prename descclassname"><span class="pre">acacia_s2s_toolkit.bias_correction.</span></span><span class="sig-name descname"><span class="pre">biascorrection_meanvariance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">forecast</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hindcast</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">observed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#acacia_s2s_toolkit.bias_correction.biascorrection_meanvariance" title="Link to this definition"></a></dt>
+<dd><p>Apply mean and variance bias correction to forecast and hindcast data.</p>
+<p>For each lead time, adjusts the mean and variance of the hindcast and
+forecast to match those of the observed data. The correction is computed
+from the hindcast/observation pair and then applied to both hindcast and
+forecast.</p>
+<section id="id8">
+<h2>Parameters<a class="headerlink" href="#id8" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>forecast<span class="classifier">xarray.DataArray</span></dt><dd><p>Forecast data with dimensions (lead_time, member, …).</p>
+</dd>
+<dt>hindcast<span class="classifier">xarray.DataArray</span></dt><dd><p>Hindcast data with dimensions (lead_time, member, init_date, …).</p>
+</dd>
+<dt>observed<span class="classifier">xarray.DataArray</span></dt><dd><p>Observed data with dimensions (lead_time, init_date, …).</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h2>Returns<a class="headerlink" href="#id9" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>forecast_adjusted<span class="classifier">xarray.DataArray</span></dt><dd><p>Bias-corrected forecast, same shape as input forecast.</p>
+</dd>
+<dt>hindcast_adjusted<span class="classifier">xarray.DataArray</span></dt><dd><p>Bias-corrected hindcast, same shape as input hindcast.</p>
+</dd>
+</dl>
+</section>
+<section id="id10">
+<h2>Notes<a class="headerlink" href="#id10" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>The correction follows:</dt><dd><p>adjusted = ((x - mean(x)) * sqrt(var(obs) / var(hindcast))) + mean(obs)</p>
+</dd>
+</dl>
+<p>Hindcast variance is computed (separately for each lead time, of course) over 
+both member and init_date dimensions.
+Grid points where hindcast variance is zero are masked (set to NaN) to
+avoid division by zero.</p>
+</section>
+</dd></dl>
+
 </section>
 
 
