@@ -1,12 +1,12 @@
 {
-    "Installation": 0.013,
-    "api": 0.09,
+    "Installation": 0.012,
+    "api": 0.079,
     "download_forecasts": 0.014,
     "download_reforecast": 0.006,
     "index": 0.003,
-    "notebooks/bias_correction_example": 0.046,
-    "notebooks/deterministic_forecast_example": 0.01,
+    "notebooks/bias_correction_example": 0.039,
+    "notebooks/deterministic_forecast_example": 0.011,
     "notebooks/postprocessing_basic_example": 0.008,
-    "notebooks/probabilistic_forecast_example": 0.135,
+    "notebooks/probabilistic_forecast_example": 0.01,
     "tips_faq": 0.002
 }
