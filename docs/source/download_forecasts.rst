@@ -1,11 +1,11 @@
 Downloading operational forecasts
-=====
+=================================
 
 .. important::
     This is a tool being developed by the ACACIA project. Please email feedback to joshua.talib@ecmwf.int.
 
 Download a forecast
------------
+-------------------
 
 To download a forecast from ECMWF's S2S database, you will need to use the `download_forecast` function from the `download_forecast.py` python module. To begin with, it is recommended that you download ECMWF forecast data first to get used to the system. 
 
@@ -89,15 +89,15 @@ Currently a download request is required for each variable.
 You can check the status of your webAPI downloads on the following `page <https://apps.ecmwf.int/webmars/joblist/>`_ . 
 
 Examples
-------------
+--------
 To be developed.
 
 
 Explanations of certain options
--------------
+-------------------------------
 
 fc_enslags (lagged ensemble capability)
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As described in `ECMWF's S2S forecast models <https://confluence.ecmwf.int/display/S2S/Models>`_, different forecasting centres run integrations at varying frequencies and ensemble sizes. Consequently, certain choices must be made to ensure a sufficient number of forecasts are downloaded.
 
@@ -107,7 +107,7 @@ The ``fc_enslags`` option allows the user to download a **lagged forecast ensemb
 - Creating a lagged ensemble will only work if a forecast was initialised on the requested lagged date.
 
 Example 1: Single forecast initialisation
-^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Suppose you want to request a JMA forecast of accumulated precipitation on **6th November 2025**. You can set ``fc_enslags=[0]``:
 
@@ -118,7 +118,7 @@ Suppose you want to request a JMA forecast of accumulated precipitation on **6th
 This will download all timesteps of forecasted precipitation from the forecast run initialised on 6th November 2025. Since ``fc_enslags`` is set to ``0``, it only includes integrations starting on that date.
 
 Example 2: Lagged forecast ensemble
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you set ``fc_enslags=[0, -1, -2]`` (the default for JMA forecasts):
 
@@ -140,7 +140,7 @@ For the lagged ensemble, the **time dimension corresponds to the forecasted peri
 
 
 leadtime_hour
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 The temporal resolution of forecast data available from ECMWF's S2S database varies depending on the selected variable. A complete list of parameters and their corresponding resolutions can be found on the `ECMWF's S2S parameter page <https://confluence.ecmwf.int/display/S2S/Parameters>`_. In general, data is provided at either six-hourly or daily intervals, and may represent instantaneous, averaged, or accumulated values. 
 
