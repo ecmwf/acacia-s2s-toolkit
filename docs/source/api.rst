@@ -1,11 +1,6 @@
 API
 ===
 
-.. autosummary::
-   :toctree: generated
-
-   lumache
-
 .. automodule:: acacia_s2s_toolkit
    :members:
    :undoc-members:
@@ -15,3 +10,4 @@ API
    :members:
    :undoc-members:
    :show-inheritance:
+
