@@ -44,4 +44,6 @@ Contents
    :maxdepth: 1
    :caption: Other
 
+   api
    tips_faq
+   
