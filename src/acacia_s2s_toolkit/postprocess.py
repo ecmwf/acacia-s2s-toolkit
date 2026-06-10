@@ -7,13 +7,11 @@ import os,sys,glob
 import xesmf as xe
 import pooch
 
-
 #this is for readthedocs to work correctly. These packages cannot be installed by pip, so one has to mock import them
 autodoc_mock_imports = ["esmpy", "xesmf", "netCDF4"]
 
 #this determines with functions will be publicly visible in the installed package
 __all__=["postprocess_forecast","get_example_data","load_raw_data"]
-
 
 #######################################################################################
 
@@ -21,8 +19,6 @@ __all__=["postprocess_forecast","get_example_data","load_raw_data"]
 # helper functions
 #
 #######################################################################################
-
-
 
 VERBOSE = True
 
