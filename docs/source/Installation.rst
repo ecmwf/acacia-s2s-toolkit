@@ -52,6 +52,15 @@ Once your ECMWF webAPI credentials are saved, install the CDS API client using `
 
 This package provides the necessary client functions for accessing ECMWF data.
 
+Forecast and reforecast configurations from different modelling centres are updated regularly. As a result, the associated forecast characteristics must also be kept up to date. To support this, lookup tables are maintained on an `ECMWF Site <https://sites.ecmwf.int/ecbox/acacia_s2s_toolkit/>`_. 
+
+To enable automatic download of the appropriate lookup table, you will also need to install the ECMWF `sites-toolkit` package: 
+
+.. code-block:: console
+    
+    python3 -m pip install sites-toolkit -i https://get.ecmwf.int/repository/pypi-all/simple
+
+
 Additional package dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In addition to requiring "*cdsapi*", this package depends on the following libraries:
@@ -78,7 +87,7 @@ Quick checklist
 Before attempting to download sub-seasonal forecast data using this python tool, please ensure you have performed the following steps:
 
 1. `Python 3 <https://www.python.org/downloads/>`_ is installed
-2. The Python packages **acacia_s2s_toolkit** and **cdsapi** are installed. 
+2. The Python packages **acacia_s2s_toolkit**, **cdsapi** and **sites-toolkit** are installed. 
 3. Your ECMWF webAPI credentials are saved in ``~/.cdsapirc.ecds`` on your working environment.
 
 

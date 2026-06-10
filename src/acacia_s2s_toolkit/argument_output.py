@@ -1,40 +1,73 @@
 # output suitable ECDS variables in light of requested forecasts.
 from acacia_s2s_toolkit import variable_dict, argument_check
+from sites.sdk.sites import Site, Authenticator
+from sites.sdk.sites.utils import FileType
 from datetime import datetime, timedelta
 from importlib import resources
 import numpy as np
 import pandas as pd
 import ast
 import calendar
+import os
 
 def read_lookup_table(fcdate='20250828'):
+    # UPDATE MADE TO PACKAGE 10th JUNE 2026. Rather than relying on upgrades to python packages to download latest lookup table, download lookup table from ECBOX (ECMWF site) and use latest information.
+
+    # read lookup table from acacia_s2s_toolkit ecbox
+    # read password
+    auth_code = 'REMOVED_ECBOX_TOKEN' # will no longer be valid by 9th June 2028 READ ACCESS ONLY
+
+    site = Site.from_space_and_name(space='ecbox', name='acacia_s2s_toolkit')
+    site_auth = Authenticator.from_token(token=auth_code)
+    content_manager = site.get_content_manager(authenticator=site_auth)
+
+    # list all lookup_tables
+    lookup_tables_list = content_manager.list(remote_path='/lookup_tables/',match_pattern='*.csv')
+    
+    # get date components of all lookup_tables
+    file_dates = [(datetime.strptime(f.split("_")[-1].replace(".csv",""),"%Y%m%d")) for f in lookup_tables_list['files']] # outputs dates + name of files.
+    file_dates = np.sort(file_dates)
+
+    # get date of first look up table
+    first_lookup_table_time = file_dates[0]
     # convert fcdate to a time field. 
     fc_dt = datetime.strptime(fcdate,'%Y%m%d')
-    csv_dir = "acacia_s2s_toolkit.lookup_tables"
-   
-    first_lookup_table_date = '20240514'
-    first_lookup_table_time = datetime.strptime(first_lookup_table_date,'%Y%m%d')
 
-    ############ new lookup table directory ##### Select the most recent lookup table compared to the requested forecast date #####
+    ###### Select the most recent lookup table compared to the requested forecast date #####
     if fc_dt < first_lookup_table_time:
-        csv_file = f'lookup_table_{first_lookup_table_date}.csv'
+        first_lookup_table_time_str = first_lookup_table_time.strftime('%Y%m%d')
+        csv_file = f'lookup_table_{first_lookup_table_time_str}.csv'
     else:
-        # list all files in directory
-        files = [f.name for f in resources.files(csv_dir).iterdir() if f.name.startswith("lookup_table_") and f.name.endswith(".csv")]
-
-        file_dates = [(datetime.strptime(f.split("_")[-1].replace(".csv",""),"%Y%m%d"),f) for f in files] # outputs dates + name of files.
-
         # select valid dates (all less than fcdate)
-        valid_dates = [(date,file) for date, file in file_dates if date <= fc_dt]
+        valid_dates = [date for date in file_dates if date <= fc_dt]
         if not valid_dates:
             raise FileNotFoundError(f"No lookup table found before {fcdate}")
 
         # pick the most recent one, then read that lookup table
-        chosen_date, csv_file = max(valid_dates, key=lambda x:x[0])
+        chosen_date = max(valid_dates)
+        chosen_date_str = chosen_date.strftime('%Y%m%d')
+        csv_file = f'lookup_table_{chosen_date_str}.csv'
 
-    with resources.open_text(csv_dir,csv_file) as fc_info:
-        df = pd.read_csv(fc_info)
+    # download lookup table
+    remote_path = f'lookup_tables/{csv_file}'
 
+    content = content_manager.download(remote_path=remote_path)
+    local_dir = "./.lookup_tables"
+    os.makedirs(local_dir, exist_ok=True)
+
+    local_path = os.path.join(local_dir, csv_file)
+
+    with open(local_path, 'wb') as f:
+        f.write(content)
+
+    if not os.path.exists(local_path):
+        raise RuntimeError("ecbox download did not create local lookup_table")
+
+    print(f"Downloaded lookup_table via ecbox: {csv_file}")
+
+    # read the lookup table
+    df = pd.read_csv(local_path)
+    
     columns_to_eval = ["fcFreq", "dayfcLags", "rfRange", "rfLagDetail"]
 
     for col in columns_to_eval:
