@@ -85,7 +85,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         
         # os.system is blunt and gives poor error handling.
         # This solution is a slightly safer version that hides warnings but still reports actual failures
-        cmd = f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
+        cmd = f'cdo -O merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
         result = subprocess.run(
             cmd,
             shell=True,
@@ -134,9 +134,13 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         request_dict['stream'] = f"enfh"
 
         # create list of hdates
-        hdates = argument_output.create_reforecast_dates(rfyears,convert_fcdate)
-        request_dict['hdate']=f"{hdates}"
-        print (request_dict)
+        #hdates = argument_output.create_reforecast_dates(rfyears,convert_fcdate)
+        #request_dict['hdate']=f"{hdates}"
+        #print (request_dict)
+
+        request_dict['hyear'] = [str(year) for year in rfyears]
+        request_dict['hmonth'] = convert_fcdate[4:6]
+        request_dict['hday']   = convert_fcdate[6:]
 
         # change components of request based on level type, and grid
         # if grid doesn't equal '1.5/1.5', add 'repres' dictionary item which sets the requested representation, in this case, 'll'=latitude/longitude.
@@ -177,7 +181,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # Merge control and perturbed forecast members into one file.
         # os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag} 2>/dev/null')
         # We suppress routine CDO warning noise, but still raise on real failures.
-        cmd = f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
+        cmd = f'cdo -O merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
 
         result = subprocess.run(
             cmd,
@@ -217,7 +221,8 @@ def rf_shifttime(fn,output_fn,shift_days=0):
             select = select.drop_vars(["valid_time","time"])
             select = select.rename({'step':'valid_time'})
             data.append(select)
-        orig_hc_new = xr.merge(data)
+        orig_hc_new = xr.concat(data, dim='valid_time')
+        #orig_hc_new = xr.merge(data)
     else:
         orig_hc_new = orig_hc.swap_dims({'time':'valid_time'})
         orig_hc_new = orig_hc_new.drop_vars("time")

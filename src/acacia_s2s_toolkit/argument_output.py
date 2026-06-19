@@ -25,7 +25,7 @@ def read_lookup_table(fcdate='20250828'):
     lookup_tables_list = content_manager.list(remote_path='/lookup_tables/',match_pattern='*.csv')
     
     # get date components of all lookup_tables
-    file_dates = [(datetime.strptime(f.split("_")[-1].replace(".csv",""),"%Y%m%d")) for f in lookup_tables_list['files']] # outputs dates + name of files.
+    file_dates = [(datetime.strptime(f['path'].split("_")[-1].replace(".csv",""),"%Y%m%d")) for f in lookup_tables_list['files']] # outputs dates + name of files.
     file_dates = np.sort(file_dates)
 
     # get date of first look up table
@@ -63,7 +63,7 @@ def read_lookup_table(fcdate='20250828'):
     if not os.path.exists(local_path):
         raise RuntimeError("ecbox download did not create local lookup_table")
 
-    print(f"Downloaded lookup_table via ecbox: {csv_file}")
+    #print(f"Downloaded lookup_table via ecbox: {csv_file}")
 
     # read the lookup table
     df = pd.read_csv(local_path)
@@ -358,7 +358,35 @@ def output_hc_lags(origin_id,fcdate):
                     smallest_pos = smallest_pos - 1
         
             return [largest_neg,smallest_pos]
+        if rf_freq_info == 'JMAoncepermonth': # twice per month
+            # make an array of dates from 2020-01-01 to 2020-12-27
+            DOM = {1:[16,31],2:[10,25],3:[12,27],4:[11,26],5:[16,31],6:[15,30],7:[15,30],8:[14,29],9:[13,28],10:[13,28],11:[12,27],12:[12,27]}
+            JMA_rf_dates = []
+            for year in (2019,2020,2021):
+                for month, days in DOM.items():
+                    for day in days:
+                        JMA_rf_dates.append(datetime(year,month,day))
+            # change year of fcdate to 2020-fcdate(MM)-fcdate(DD)
+            fc_date_2020 = datetime.strptime(f"2020{fcdate[4:]}",'%Y%m%d')
 
+            lags = [(c-fc_date_2020).days for c in JMA_rf_dates]
+            closest = min(lags,key=abs) # get closest value
+            
+            # need to change lag if leap year. the lags are calculated with year 2020 in mind but it may be the case that the chosen forecasted year is not a leap year, hence day lags will be out by 1.
+            
+            fc_is_leap_year = calendar.isleap(datetime.strptime(fcdate,'%Y%m%d').year)
+            leap_day_2020 = datetime(2020,2,29)
+            
+            if (closest is not None) and (not fc_is_leap_year):
+                ref_dt = fc_date_2020 + timedelta(days=closest)
+                if crosses_leap_day(ref_dt, fc_date_2020, leap_day_2020):
+                    # shrink magnitude by 1
+                    if closest < 0:
+                        closest += 1
+                    else:
+                        closest -= 1
+
+            return closest
 
 def crosses_leap_day(ref_dt, anchor_dt, leap_day):
     """True if the closed-open interval between ref_dt and anchor_dt crosses leap_day."""
@@ -593,11 +621,10 @@ def create_reforecast_dates(rfyears,rfdate):
     ''' function that produces a list of reforecast dates given set of years and chosen reforecast date
     '''
     if np.size(rfdate) == 1: # for a single reforecast date that is then repeated for all reforecast years
-        YY = rfdate[:4]
         MM = rfdate[4:6]
         DD = rfdate[6:]
-        # only select first and last year
-        rf_dates = '/'.join(f"{int(year)}-{MM}-{DD}" for year in rfyears[[0,-1]])
+        # select all years
+        rf_dates = ','.join(f'"{int(year)}-{MM}-{DD}"' for year in rfyears)
     else:
         stored_dates = []
         for date in rfdate:
@@ -605,7 +632,7 @@ def create_reforecast_dates(rfyears,rfdate):
             MM = date[4:6]
             DD = date[6:]
             stored_dates.append(f"{YY}-{MM}-{DD}")
-        rf_dates = '/'.join(f"{date}" for date in stored_dates) 
+        rf_dates = ','.join(f'"{date}"' for date in stored_dates) 
     return rf_dates
  
 def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,fc_enslags):
