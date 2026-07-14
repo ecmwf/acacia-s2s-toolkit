@@ -46,18 +46,18 @@ def empty_member_dataset():
         }
     )
 
-def get_VITART_indexes():
+def get_s2sFTP_tokens():
     config_file = Path.home() / ".acacia_s2s_toolkit.yml"
 
     with open(config_file) as f:
         config = yaml.safe_load(f)
 
-    return config["VITART_idx_user"], config["VITART_idx_pw"]
+    return config["ftp_user"], config["ftp_password"]
 
 def load_fc_tracks(model,fcdate):
     # load in data
     session = ftplib.FTP('aux.ecmwf.int')
-    user, pwrd = get_VITART_indexes()
+    user, pwrd = get_s2sFTP_tokens()
     session.login(user=user,passwd=pwrd)
     session.cwd("TCYC")
     
@@ -82,7 +82,7 @@ def load_fc_tracks(model,fcdate):
 def load_rffc_tracks(model,rfdate,fcdate):
     # load in data
     session = ftplib.FTP('aux.ecmwf.int')
-    user, pwrd = get_VITART_indexes()
+    user, pwrd = get_s2sFTP_tokens()
     session.login(user=user,passwd=pwrd)
     session.cwd("TCYC")
 

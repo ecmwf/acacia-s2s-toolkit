@@ -42,6 +42,23 @@ For the acacia_s2s_toolkit, please save these credentials to your home directory
 .. important::
     Please note that the credentials should be saved in a file called ``~/.cdsapirc.ecds`` and not the default ``~/.cdsapirc``. This is to avoid confusion with API credentials accessing ECMWF Climate Data Store (i.e. for ERA5 data). 
 
+Saving Additional Credentials
+-----------------------------
+
+In addition to your ECMWF Data Store credentials, the toolkit requires access credentials for retrieving post-processed sub-seasonal indices (e.g. tropical storm diagnostics) and model lookup tables used to identify forecast and reforecast configurations.
+
+Create a file called ``~/.acacia_s2s_toolkit.yml`` in your home directory with the following contents:
+
+.. code-block:: yaml
+
+    ecbox_token: <your-ecbox-token>
+    ftp_user: REMOVED_S2S_USERNAME_PASSWORD
+    ftp_password: REMOVED_S2S_USERNAME_PASSWORD
+
+.. important::
+
+    The configuration file must be named exactly ``~/.acacia_s2s_toolkit.yml`` and located in your home directory.
+
 Installing ECMWF client libraries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Once your ECMWF webAPI credentials are saved, install the CDS API client using ``pip``:
@@ -55,7 +72,6 @@ This package provides the necessary client functions for accessing ECMWF data.
 Forecast and reforecast configurations from different modelling centres are updated regularly. As a result, the associated forecast characteristics must also be kept up to date. To support this, lookup tables are maintained on an `ECMWF Site <https://sites.ecmwf.int/ecbox/acacia_s2s_toolkit/>`_. 
 
 To enable automatic download of the appropriate lookup table, you will also need to install the ECMWF `sites-toolkit` package: 
-
 .. code-block:: console
     
     python3 -m pip install sites-toolkit -i https://get.ecmwf.int/repository/pypi-all/simple
