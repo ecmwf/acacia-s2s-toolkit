@@ -144,7 +144,7 @@ leadtime_hour
 
 The temporal resolution of forecast data available from ECMWF's S2S database varies depending on the selected variable. A complete list of parameters and their corresponding resolutions can be found on the `ECMWF's S2S parameter page <https://confluence.ecmwf.int/display/S2S/Parameters>`_. In general, data is provided at either six-hourly or daily intervals, and may represent instantaneous, averaged, or accumulated values. 
 
-The Python-based dictionary called ``s2s_variables`` in `variable_dict.py <https://github.com/joshuatalib/acacia_s2s_toolkit/blob/main/src/acacia_s2s_toolkit/variable_dict.py>`_ provides an overview of all avaliable parameters and their associated temporal resolutions.
+The Python-based dictionary called ``s2s_variables`` in `variable_dict.py <https://github.com/ecmwf/acacia-s2s-toolkit/blob/main/src/acacia_s2s_toolkit/variable_dict.py>`_ provides an overview of all avaliable parameters and their associated temporal resolutions.
 
 When downloading a variable, the default behaviour is to retrieve all available lead times. For example,
 

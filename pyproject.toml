@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/joshuatalib/acacia_s2s_toolkit"
+Homepage = "https://github.com/ecmwf/acacia-s2s-toolkit"
 
 # build system
 [build-system]
