@@ -2,6 +2,7 @@
 install_as_local_package.sh
 example_notebooks/data
 src/acacia_s2s_toolkit/.webAPI_requests.py
+.gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
