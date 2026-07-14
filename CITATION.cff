@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "ACACIA S2S Toolkit"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - family-names: "Talib"
+    given-names: "Joshua"
+repository-code: "https://github.com/ecmwf/acacia-s2s-toolkit"
+url: "https://github.com/ecmwf/acacia-s2s-toolkit"
+license: "Apache-2.0"
