@@ -7,9 +7,23 @@ import os
 import huracanpy as hpy
 from acacia_s2s_toolkit import argument_output
 from datetime import datetime, timedelta
+from pathlib import Path
+import yaml
+import tarfile
 
 # this is for sphinx - only functions listed here will have entries in readthedocs API
 __all__ = ["download_forecast_TCtracks", "download_reforecast_TCtracks"]
+
+def safe_extract_tar(archive_path, extract_dir="."):
+    archive_path = Path(archive_path)
+    extract_dir = Path(extract_dir).resolve()
+
+    with tarfile.open(archive_path) as tar:
+        for member in tar.getmembers():
+            member_path = (extract_dir / member.name).resolve()
+            if not str(member_path).startswith(str(extract_dir) + os.sep) and member_path != extract_dir:
+                raise ValueError(f"Unsafe path in tar archive: {member.name}")
+        tar.extractall(path=extract_dir)
 
 def empty_member_dataset():
     return xr.Dataset(
@@ -29,10 +43,19 @@ def empty_member_dataset():
         }
     )
 
+def get_VITART_indexes():
+    config_file = Path.home() / ".acacia_s2s_toolkit.yml"
+
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+
+    return config["VITART_idx_user"], config["VITART_idx_pw"]
+
 def load_fc_tracks(model,fcdate):
     # load in data
     session = ftplib.FTP('aux.ecmwf.int')
-    session.login(user='REMOVED_S2S_USERNAME_PASSWORD',passwd='REMOVED_S2S_USERNAME_PASSWORD')
+    user, pwrd = get_VITART_indexes()
+    session.login(user=user,passwd=pwrd)
     session.cwd("TCYC")
     
     # create filepath
@@ -56,7 +79,8 @@ def load_fc_tracks(model,fcdate):
 def load_rffc_tracks(model,rfdate,fcdate):
     # load in data
     session = ftplib.FTP('aux.ecmwf.int')
-    session.login(user='REMOVED_S2S_USERNAME_PASSWORD',passwd='REMOVED_S2S_USERNAME_PASSWORD')
+    user, pwrd = get_VITART_indexes()
+    session.login(user=user,passwd=pwrd)
     session.cwd("TCYC")
 
     # create filepath
@@ -103,7 +127,7 @@ def download_reforecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_s
             fn = load_rffc_tracks(model,new_rfdate,rf_model_date) # load in forecast TC track file from Frederic's FTP site
 
             # untar the file. will give all ensemble members. for ECMWF 101.
-            os.system(f'tar -xf {fn}')
+            safe_extract_tar(fn)
 
             short_name = origin_id  # need to get short name. add to look-up file
             num_pert_hcs = argument_output.get_single_parameter(origin_id,convert_fcdate,'rfNumEns')+1
@@ -113,7 +137,7 @@ def download_reforecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_s
 
             for num in range(num_pert_hcs):
                 # untar first ens mem
-                os.system(f'tar -xf {short_name}.{convert_fcdate}.{new_rfdate}.{num}')
+                safe_extract_tar(f"{short_name}.{convert_fcdate}.{new_rfdate}.{num}")
 
                 all_storms = []
 
@@ -239,7 +263,7 @@ def download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_sav
         fn = load_fc_tracks(model,convert_fcdate) # load in forecast TC track file from Frederic's FTP site
         
         # untar the file. will give all ensemble members. for ECMWF 101.
-        os.system(f'tar -xf {fn}')
+        safe_extract_tar(fn)
         
         short_name = origin_id  # need to get short name. add to look-up file
         num_ens_mems = argument_output.get_single_parameter(origin_id,convert_fcdate,'fcNumEns')+1
@@ -249,7 +273,7 @@ def download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_sav
         
         for num in range(num_ens_mems):
             # untar first ens mem
-            os.system(f'tar -xf {short_name}.{convert_fcdate}.{num}')
+            safe_extract_tar(f"{short_name}.{convert_fcdate}.{num}")
             
             all_storms = []
             

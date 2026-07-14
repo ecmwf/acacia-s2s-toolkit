@@ -9,13 +9,23 @@ import pandas as pd
 import ast
 import calendar
 import os
+from pathlib import Path
+import yaml
+
+def get_ecbox_token():
+    config_file = Path.home() / ".acacia_s2s_toolkit.yml"
+
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+
+    return config["ecbox_token"]
 
 def read_lookup_table(fcdate='20250828'):
     # UPDATE MADE TO PACKAGE 10th JUNE 2026. Rather than relying on upgrades to python packages to download latest lookup table, download lookup table from ECBOX (ECMWF site) and use latest information.
 
     # read lookup table from acacia_s2s_toolkit ecbox
     # read password
-    auth_code = 'REMOVED_ECBOX_TOKEN' # will no longer be valid by 9th June 2028 READ ACCESS ONLY
+    auth_code = get_ecbox_token() # looks up ecbox_token saved in acacia_s2s_tookit.yml file
 
     site = Site.from_space_and_name(space='ecbox', name='acacia_s2s_toolkit')
     site_auth = Authenticator.from_token(token=auth_code)
