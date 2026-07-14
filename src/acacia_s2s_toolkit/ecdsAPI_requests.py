@@ -7,10 +7,19 @@ import xarray as xr
 from datetime import datetime, timedelta
 import subprocess
 import cdsapi
+import glob
+from pathlib import Path
 
 def get_ecds_client():
     os.environ["CDSAPI_RC"] = os.path.expanduser("~/.cdsapirc.ecds")
     return cdsapi.Client()
+
+def cleanup_patterns(*patterns):
+    for pattern in patterns:
+        for path_str in glob.glob(pattern):
+            path = Path(path_str)
+            if path.is_file():
+                path.unlink()
 
 def create_initial_ecdsAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes):
     request_dict = {
@@ -79,24 +88,13 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # once requesting control and perturbed forecast, combine the two.
         # set forecast type in control to pf (perturbed forecast).
         set_cf_to_pf(f'{filename}_control_{lag}',f'{filename}_control2_{lag}')
-        
+       
         # merge both control and perturbed forecast
-        # os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}')
-        
-        # os.system is blunt and gives poor error handling.
-        # This solution is a slightly safer version that hides warnings but still reports actual failures
-        cmd = f'cdo -O merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+        cmd = ["cdo","-O","merge",f"{filename}_control2_{lag}",f"{filename}_perturbed_{lag}",f"{filename}_allens_{lag}",]
+        result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
         if result.returncode != 0:
             print(result.stderr)
-            raise subprocess.CalledProcessError(result.returncode, cmd)
-    
+            raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
 
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # smae process following even with one forecast initialisation date to ensure same structure for all output. 
@@ -104,7 +102,8 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     combined_forecast.to_netcdf(f'{filename}.nc')
 
     # remove previous files  
-    os.system(f'rm {filename}_control* {filename}_perturbed* {filename}_allens*')
+    # remove previous files
+    cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",)  
 
 def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,rf_enslags,rf_years,fc_time=True):
     # to enable lagged ensemble, loop through requested ensembles
@@ -179,22 +178,13 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         set_cf_to_pf(f'{filename}_control_{lag}',f'{filename}_control2_{lag}')
 
         # Merge control and perturbed forecast members into one file.
-        # os.system(f'cdo merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag} 2>/dev/null')
         # We suppress routine CDO warning noise, but still raise on real failures.
-        cmd = f'cdo -O merge {filename}_control2_{lag} {filename}_perturbed_{lag} {filename}_allens_{lag}'
-
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
+        cmd = ["cdo","-O","merge",f"{filename}_control2_{lag}",f"{filename}_perturbed_{lag}",f"{filename}_allens_{lag}",]
+        result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
         if result.returncode != 0:
             print(result.stderr)
-            raise subprocess.CalledProcessError(result.returncode, cmd)
-    
+            raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+
         # shift the time so all reforecasts have the same time values
         if fc_time:
             shift_day_value = lag*-1
@@ -209,7 +199,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     combined_forecast.to_netcdf(f'{filename}.nc')
 
     # remove previous files  
-    os.system(f'rm {filename}_control* {filename}_perturbed* {filename}_*allens*')
+    cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",)
 
 def rf_shifttime(fn,output_fn,shift_days=0):
     orig_hc = xr.open_dataset(fn,engine='cfgrib')
