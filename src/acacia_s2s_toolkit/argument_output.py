@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
+# SPDX-License-Identifier: Apache-2.0
+
 # output suitable ECDS variables in light of requested forecasts.
 from acacia_s2s_toolkit import variable_dict, argument_check
 from sites.sdk.sites import Site, Authenticator

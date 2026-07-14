@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
+# SPDX-License-Identifier: Apache-2.0
+
 # a dictionary with all the variable abbreviations in the appropriate categories for plev/sfc, six_hourly, 24 hour instanteous.
 
 s2s_variables = {

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
+# SPDX-License-Identifier: Apache-2.0
+
 # script containing all relevant code for producing ecdsAPI requests.
 from acacia_s2s_toolkit import argument_output, merge_lag_ensemble
 import numpy as np

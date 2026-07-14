@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
+# SPDX-License-Identifier: Apache-2.0
+
 # Check that requested variables are appropriate and are compatiable with WMO lead centre.
 from acacia_s2s_toolkit.variable_dict import s2s_variables
 from difflib import get_close_matches
