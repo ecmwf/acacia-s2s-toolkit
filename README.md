@@ -10,6 +10,20 @@ It builds on [xarray](https://xarray.dev/) for efficient NetCDF-based data handl
 
 ---
 
+## Software Maturity
+
+| Attribute        | Status |
+|------------------|--------|
+| **Maturity**     | [![Static Badge](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity/sandbox_badge.svg)](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity#sandbox) |
+| **Support level**| Best effort — no guaranteed response time |
+| **Operational use** | Not suitable for operational use |
+
+
+> [!IMPORTANT]
+> This software is **Sandbox**, is under active development, and subject to ECMWF's guidelines on [Software Maturity](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity). Releases are intended for testing, evaluation, and collaboration rather than production deployment.
+
+---
+
 ## Installation
 
 To install the *acacia-s2s-toolkit* on Linux, run the following command:
@@ -36,6 +50,10 @@ The AI-WQ-package requires the following dependencies:
 
 If these dependencies conflict with your current working environment, consider installing the package in a new virtual environment.
 
+Additionally, to enable automatic download of the appropriate lookup table, you will also need to install the ECMWF sites-toolkit package:
+
+**python3 -m pip install sites-toolkit -i https://get.ecmwf.int/repository/pypi-all/simple**
+
 ---
 
 ## Upgrading the Package
@@ -48,23 +66,11 @@ This project is being actively developed. New updates may be released periodical
 
 ---
 
-## Software Maturity
-
-| Attribute        | Status |
-|------------------|--------|
-| **Maturity**     | [![Static Badge](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity/sandbox_badge.svg)](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity#sandbox) |
-| **Support level**| Best effort — no guaranteed response time |
-| **Operational use** | Not suitable for operational use |
-
-
-> [!IMPORTANT]
-> This software is **Sandbox**, is under active development, and subject to ECMWF's guidelines on [Software Maturity](https://github.com/ecmwf/codex/raw/refs/heads/main/Project%20Maturity). Releases are intended for testing, evaluation, and collaboration rather than production deployment.
-
----
-
 ## License
 
 This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for the full text.
+
+In applying this licence, ECMWF does not waive the privileges and immunities granted to it by virtue of its status as an intergovernmental organisation, nor does it submit to any jurisdiction.
 
 ---
 
