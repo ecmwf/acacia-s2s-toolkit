@@ -3,10 +3,9 @@
 
 # output suitable ECDS variables in light of requested forecasts.
 from acacia_s2s_toolkit import variable_dict, argument_check
-from sites.sdk.sites import Site, Authenticator
-from sites.sdk.sites.utils import FileType
 from datetime import datetime, timedelta
 from importlib import resources
+import requests
 import numpy as np
 import pandas as pd
 import ast
@@ -15,31 +14,14 @@ import os
 from pathlib import Path
 import yaml
 
-def get_ecbox_token():
-    config_file = Path.home() / ".acacia_s2s_toolkit.yml"
-
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
-
-    return config["ecbox_token"]
-
 def read_lookup_table(fcdate='20250828'):
-    # UPDATE MADE TO PACKAGE 10th JUNE 2026. Rather than relying on upgrades to python packages to download latest lookup table, download lookup table from ECBOX (ECMWF site) and use latest information.
+    # Open public ecbox contain .csv files with lookup tables.
+    url = "https://sites.ecmwf.int/ecbox/acacia_s2s_toolkit/s/api/v2/pub/files/lookup_tables"
+    r = requests.get(url)
+    lookup_tables_list = r.json()
 
-    # read lookup table from acacia_s2s_toolkit ecbox
-    # read password
-    auth_code = get_ecbox_token() # looks up ecbox_token saved in acacia_s2s_tookit.yml file
-
-    site = Site.from_space_and_name(space='ecbox', name='acacia_s2s_toolkit')
-    site_auth = Authenticator.from_token(token=auth_code)
-    content_manager = site.get_content_manager(authenticator=site_auth)
-
-    # list all lookup_tables
-    lookup_tables_list = content_manager.list(remote_path='/lookup_tables/',match_pattern='*.csv')
-    
     # get date components of all lookup_tables
-    file_dates = [(datetime.strptime(f['path'].split("_")[-1].replace(".csv",""),"%Y%m%d")) for f in lookup_tables_list['files']] # outputs dates + name of files.
-    file_dates = np.sort(file_dates)
+    file_dates = np.sort([datetime.strptime(f["path"].split("_")[-1].replace(".csv", ""),"%Y%m%d") for f in lookup_tables_list["files"] if f["path"].startswith("lookup_table_")])
 
     # get date of first look up table
     first_lookup_table_time = file_dates[0]
@@ -61,30 +43,13 @@ def read_lookup_table(fcdate='20250828'):
         chosen_date_str = chosen_date.strftime('%Y%m%d')
         csv_file = f'lookup_table_{chosen_date_str}.csv'
 
-    # download lookup table
-    remote_path = f'lookup_tables/{csv_file}'
+    # read lookup table
+    df = pd.read_csv(f'{url}/{csv_file}') # read csv file (lookup table). 
 
-    content = content_manager.download(remote_path=remote_path)
-    local_dir = "./.lookup_tables"
-    os.makedirs(local_dir, exist_ok=True)
-
-    local_path = os.path.join(local_dir, csv_file)
-
-    with open(local_path, 'wb') as f:
-        f.write(content)
-
-    if not os.path.exists(local_path):
-        raise RuntimeError("ecbox download did not create local lookup_table")
-
-    #print(f"Downloaded lookup_table via ecbox: {csv_file}")
-
-    # read the lookup table
-    df = pd.read_csv(local_path)
-    
     columns_to_eval = ["fcFreq", "dayfcLags", "rfRange", "rfLagDetail"]
 
     for col in columns_to_eval:
-        # if the option is a list of numbers or zero.
+        # if the option is a list of numbers or zero. line is ensuring lists and numbers are not strings
         df[col] = df[col].apply(lambda x: int(x) if x == "0" else (ast.literal_eval(x) if isinstance(x, str) and (x.startswith("[") or x.startswith("(")) else x)) 
     return df
 

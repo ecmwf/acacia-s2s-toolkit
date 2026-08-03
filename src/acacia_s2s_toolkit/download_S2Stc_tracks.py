@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
 import tarfile
+import requests
 
 # this is for sphinx - only functions listed here will have entries in readthedocs API
 __all__ = ["download_forecast_TCtracks", "download_reforecast_TCtracks"]
@@ -47,12 +48,13 @@ def empty_member_dataset():
     )
 
 def get_s2sFTP_tokens():
-    config_file = Path.home() / ".acacia_s2s_toolkit.yml"
+    # open text file contain aux site passwords
+    url = 'https://sites.ecmwf.int/ecbox/acacia_s2s_toolkit/s/api/v2/pub/files/S2Saux_user_pwrd'
+    r = requests.get(url)
+    r.raise_for_status()
+    creds = r.json()
 
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
-
-    return config["ftp_user"], config["ftp_password"]
+    return creds["user"], creds["password"]
 
 def load_fc_tracks(model,fcdate):
     # load in data
