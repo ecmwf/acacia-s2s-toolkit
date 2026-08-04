@@ -249,9 +249,6 @@ def download_reforecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_s
         os.remove(f"{basin}")
 
 def download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags): 
-    '''
-    need to do something with leadtime_hour parameter
-    '''
     # extract multiple ens lags
     lag_i = 0
     all_fcs = []

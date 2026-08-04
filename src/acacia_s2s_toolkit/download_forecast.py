@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
 # SPDX-License-Identifier: Apache-2.0
 
-# download sub-seasonal forecast data from WMO lead centre
-from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requests, download_S2Stc_tracks
+# download sub-seasonal forecast data from S2S prediction project
+from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requests, download_S2Stc_tracks, download_S2SMJO_indices
 import os
 import sys
 import datetime
@@ -47,7 +47,7 @@ def download_forecast(model,
                       verbose=True):
 
     """
-    Overarching function that will download forecast data from ECDS.
+    Overarching function that will download forecast data from ECDS or aux.S2S
 
     Parameters
     ----------
@@ -337,40 +337,16 @@ def download_forecast(model,
         print(f"[INFO] Downloading {variable} (plevs={plevs}) for {country_name or region_name or bbox_bounds}")
         print(f"[INFO] Saving as {filename_save}")
 
-    # WEBAPI REQUEST FROM S2S DATABASE
-    if variable != 'TC_TRACKS':
+    # ECDS REQUEST FROM S2S DATABASE
+    if variable not in ['TC_TRACKS','MJO']:
         try:
             if verbose:
-                ecdsAPI_requests.request_forecast(
-                    fcdate,
-                    origin_id,
-                    grid_for_request,
-                    variable,
-                    bbox_bounds,
-                    data_format,
-                    webapi_param,
-                    leadtime_hour,
-                    leveltype,
-                    filename_save,
-                    plevs,
-                    fc_enslags
-                )
+                ecdsAPI_requests.request_forecast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,
+                                                  data_format,webapi_param,leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
             else:
                 with SuppressOutput():
-                    ecdsAPI_requests.request_forecast(
-                        fcdate,
-                        origin_id,
-                        grid_for_request,
-                        variable,
-                        bbox_bounds,
-                        data_format,
-                        webapi_param,
-                        leadtime_hour,
-                        leveltype,
-                        filename_save,
-                        plevs,
-                        fc_enslags
-                    )
+                    ecdsAPI_requests.request_forecast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,
+                                                  data_format,webapi_param,leadtime_hour,leveltype,filename_save,plevs,fc_enslags)
         except Exception:
             print(f"[ERROR] Download failed for {filename_save}")
             raise
@@ -378,26 +354,22 @@ def download_forecast(model,
     elif variable == 'TC_TRACKS':
         try:
             if verbose:
-                download_S2Stc_tracks.download_forecast_TCtracks(
-                    fcdate,
-                    model,
-                    origin_id,
-                    leadtime_hour,
-                    filename_save,
-                    fc_enslags
-                )
+                download_S2Stc_tracks.download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
             else:
                 with SuppressOutput():
-                    download_S2Stc_tracks.download_forecast_TCtracks(
-                        fcdate,
-                        model,
-                        origin_id,
-                        leadtime_hour,
-                        filename_save,
-                        fc_enslags
-                    )
+                    download_S2Stc_tracks.download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
+        except Exception:
+            print(f"[ERROR] Download failed for {filename_save}")
+            raise
+    elif variable == 'MJO':
+        try:
+            if verbose:
+                download_S2SMJO_indices.download_forecast_MJO(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
+            else:
+                with SuppressOutput():
+                    download_S2SMJO_indices.download_forecast_MJO(fcdate,model,origin_id,leadtime_hour,filename_save,fc_enslags)
         except Exception:
             print(f"[ERROR] Download failed for {filename_save}")
             raise
 
-    return filename__save
+    return filename_save

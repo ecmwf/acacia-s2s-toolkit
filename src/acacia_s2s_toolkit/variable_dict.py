@@ -12,7 +12,7 @@ s2s_variables = {
             "instantaneous_6hrly":["10u","10v","mx2t6","mn2t6",],
             "averaged_24hrs":["cape","skt","sd","rsn","asn","sm20","sm100","st20","st100","2t","2d","wtmp","ci","tcc","tcw",],
             "accumulated_24hrs":["sf","ttr","slhf","ssr","str","sshf","ssrd","strd","cp","nsss","ewss","ro","sro"],
-            "instantaneous_24hrs":["sp","msl","lsm","orog","slt","TC_TRACKS"],
+            "instantaneous_24hrs":["sp","msl","lsm","orog","slt","TC_TRACKS","MJO"],
             "accumulated_6hrly":["tp"]
             }
         }

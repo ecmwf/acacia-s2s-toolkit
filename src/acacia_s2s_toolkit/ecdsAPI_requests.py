@@ -80,10 +80,6 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
 
         # then download perturbed. change type of forecast, add number of ensemble members, and change target filename
         request_dict['type'] = 'pf'
-        # add model number (will not be needed for ECDSapi)
-        #num_pert_fcs = argument_output.get_single_parameter(origin,fcdate,'fcNumEns')
-        #pert_fcs = '/'.join(str(x) for x in np.arange(1,num_pert_fcs+1))
-        #request_dict['number'] = f"{pert_fcs}"
 
         target = f'{filename}_perturbed_{lag}' 
         client.retrieve(dataset,request_dict,target)
@@ -105,7 +101,6 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     combined_forecast.to_netcdf(f'{filename}.nc')
 
     # remove previous files  
-    # remove previous files
     cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",)  
 
 def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,leveltype,filename,plevs,rf_enslags,rf_years,fc_time=True):
@@ -135,11 +130,6 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # download reforecast, so change stream
         request_dict['stream'] = f"enfh"
 
-        # create list of hdates
-        #hdates = argument_output.create_reforecast_dates(rfyears,convert_fcdate)
-        #request_dict['hdate']=f"{hdates}"
-        #print (request_dict)
-
         request_dict['hyear'] = [str(year) for year in rfyears]
         request_dict['hmonth'] = convert_fcdate[4:6]
         request_dict['hday']   = convert_fcdate[6:]
@@ -168,10 +158,6 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
 
         # then download perturbed. change type of forecast, add number of ensemble members, and change target filename
         request_dict['type'] = 'pf'
-        # add model number (will not be needed for ECDSapi)
-        #num_pert_hcs = argument_output.get_single_parameter(origin,convert_fcdate,'rfNumEns')
-        #pert_hcs = '/'.join(str(x) for x in np.arange(1,num_pert_hcs+1))
-        #request_dict['number'] = f"{pert_hcs}"
 
         target=f"{filename}_perturbed_{lag}"
         client.retrieve(dataset,request_dict,target)

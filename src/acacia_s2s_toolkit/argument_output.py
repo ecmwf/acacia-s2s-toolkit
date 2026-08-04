@@ -117,6 +117,8 @@ def output_leadtime_hour(variable, origin_id, fcdate, fc_enslags, start_time=0):
     if is_jma and is_instant_24:
         # JMA forecasts do not include 0
         leadtime_hour = leadtime_hour[leadtime_hour != 0]
+    if variable == 'MJO': # initial MJO state not saved
+        leadtime_hour = leadtime_hour[leadtime_hour != 0]
 
     return leadtime_hour
 
