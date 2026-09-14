@@ -154,6 +154,8 @@ def download_reforecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_s
 
                     if len(lines) > 1:
                         storms = hpy.load(basin,source='ecmwf')
+                        if basin == 'sin' or basin == 'spc' or basin == 'aus':
+                            storms['lat'] = storms['lat']*-1.0 # convert to SH latitudes
                         n = storms.sizes['record']
                         # add dimension with basin
                         storms = storms.assign_coords(basin=('record', np.repeat(basin, n)))
@@ -287,6 +289,8 @@ def download_forecast_TCtracks(fcdate,model,origin_id,leadtime_hour,filename_sav
             
                 if len(lines) > 1:
                     storms = hpy.load(basin,source='ecmwf')
+                    if basin == 'sin' or basin == 'spc' or basin == 'aus':
+                        storms['lat'] = storms['lat']*-1.0 # convert to SH latitudes
                     n = storms.sizes['record']
                     # add dimension with basin
                     storms = storms.assign_coords(basin=('record', np.repeat(basin, n)))
