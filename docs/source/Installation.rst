@@ -9,7 +9,7 @@ Getting started
 Installation
 ------------
 
-To use the **acacia_s2s_toolkit**, you will first need to have `Python 3 <https://www.python.org/downloads/>`_ installed.
+To use the **acacia-s2s-toolkit**, you will first need to have `Python 3 <https://www.python.org/downloads/>`_ installed.
 
 You can then install the package using ``pip``:
 
