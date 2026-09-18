@@ -19,13 +19,17 @@ After this, use the `download_hindcast` function to download operational reforec
 
 .. code-block:: python
 
-   download_hindcast(model, variable, fcdate=None, plevs=None, country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", leadtime_hour=None, rf_years=None, rf_enslags=None, fc_time=True, overwrite=False, verbose=True)
+   download_hindcast(variable, model='ECMWF', fcdate=None, # key forecast parameters
+                     leadtime_hour=None, start_lt=0, end_lt=None, period='1D', # variables that define leadtimes to download
+                     country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], # variables that enable you to define spatial grid
+                     plevs=None, # optional variable when downloading pressure-level data
+                     filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", # characteristics associated with saved file
+                     rf_enslags=None, rf_years=None, fc_time=True, # defined lags for lagged ensemble + time coordinate
+                     overwrite=False, verbose=True, cleanup=True) # options associated with saved outputs
 
 This function retrieves operational reforecast (hindcast) data for a specified model and variable from the S2S database. It supports downloading multiple initialization years and ensemble lags for a given forecasting system.
 
 :Necessary parameters:
-
-- **model** (*str*): The forecasting model. The full list of supported models is avaliable on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage.
 
 - **variable** (*str*): The forecasted variable to download. Use variable abbreviations listed on `ECMWF's S2S parameter page <https://confluence.ecmwf.int/display/S2S/Parameters>`_.
 
@@ -35,7 +39,7 @@ This function retrieves operational reforecast (hindcast) data for a specified m
 
 :Optional parameters:
 
-Parameters including **fcdate**, **plevs**, **location_name**, **bbox_bounds**, **filename**, **data_save_dir**, **data_format**, **grid**, **leadtime_hour**, **overwrite** and **verbose** are described in detail on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. Additional parameters specific to reforecast downloads include:
+Parameters including **model**, **fcdate**, **plevs**, **location_name**, **bbox_bounds**, **filename**, **data_save_dir**, **data_format**, **grid**, **leadtime_hour**, **overwrite** and **verbose** are described in detail on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. Additional parameters specific to reforecast downloads include:
 
 - **rf_years** (*list of int*, optional): List of years to download reforecasts for. For example, [2000, 2001, 2002] will retrieve all reforecasts initialised between 2000 and 2002. Please note, due to changes when transferring to ECMWF Climate Data Store, all rf_years will be downloaded between the minimum and maximum of requested rf_years. 
 
