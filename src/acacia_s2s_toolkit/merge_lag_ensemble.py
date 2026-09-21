@@ -71,14 +71,14 @@ def merge_all_ens_members(filename,leveltype):
     return combined
 
 def merge_all_ens_hindcasts(filename,leveltype):
-    all_fcs = xr.open_mfdataset(f'{filename}_allens_*',combine='nested',concat_dim='fc_init_member') # open mfdataset but have fc_init_member as a dimension, i.e. number of forecast initialisations used.
+    all_fcs = xr.open_mfdataset(f'{filename}_allens_*',combine='nested',concat_dim='lag') # open mfdataset but have fc_init_member as a dimension, i.e. number of forecast initialisations used.
 
-    if "fc_init_member" not in all_fcs.dims:
-        all_fcs = all_fcs.expand_dims("fc_init_member") # expand a fc_init_member if only one file is download. it will have a dimension of 1. 
+    if "lag" not in all_fcs.dims:
+        all_fcs = all_fcs.expand_dims("lag") # expand a fc_init_member if only one file is download. it will have a dimension of 1. 
 
-    combined = all_fcs.stack(member=("fc_init_member", "number")).reset_index("member", drop=True)
+    combined = all_fcs.stack(member=("lag", "number"))
 
-    refine_combined_array(combined,leveltype)
+    combined = refine_combined_array(combined,leveltype)
 
     return combined
 

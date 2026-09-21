@@ -252,12 +252,12 @@ def download_hindcast(variable,
             if verbose:
                 ecdsAPI_requests.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
                                                       webapi_param,leadtime_hour,period,leveltype,filename_save,plevs,
-                                                      rf_enslags,rf_years,aggregation_switch,fc_time=fc_time,cleanup=cleanup)
+                                                      rf_enslags,rf_years,start_lt,aggregation_switch,fc_time=fc_time,cleanup=cleanup)
             else:
                 with SuppressOutput():
                     ecdsAPI_requests.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
                                                       webapi_param,leadtime_hour,period,leveltype,filename_save,plevs,
-                                                      rf_enslags,rf_years,aggregation_switch,fc_time=fc_time,cleanup=cleanup)
+                                                      rf_enslags,rf_years,start_lt,aggregation_switch,fc_time=fc_time,cleanup=cleanup)
         elif variable == 'TC_TRACKS':
             if verbose:
                 download_S2Stc_tracks.download_reforecast_TCtracks(

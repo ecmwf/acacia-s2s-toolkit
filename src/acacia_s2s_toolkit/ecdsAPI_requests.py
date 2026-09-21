@@ -26,6 +26,59 @@ def cleanup_patterns(*patterns):
             if path.is_file():
                 path.unlink()
 
+def accumulate_single_fc(fc,start_lt):
+    start_times = fc.time.isel(time=slice(0, -1))
+    fc = fc.diff(dim='time')
+    fc = fc.assign_coords(time=start_times)
+    # First interval is only needed to establish the accumulation
+    # at start_lt, so remove it from the output.
+    if start_lt > 0:
+        fc = fc.isel(time=slice(1, None))
+    return fc
+
+def average_single_fc(fc,period):
+    # if not accumulated, work out average field, like weekly averages.
+    n_days = int(period[:-1])  # e.g. 7 for '7D'
+    # trim to complete periods
+    n_complete = (fc.sizes['time'] // n_days) * n_days
+    # Save start times before aggregation
+    start_times = fc.time.isel(time=slice(0, n_complete, n_days))
+    fc = (fc.isel(time=slice(0, n_complete)).coarsen(time=n_days, boundary='trim').mean())
+    # Force time coordinate to start of averaging period
+    fc = fc.assign_coords(time=start_times)
+    return fc
+
+def aggregation_process(combined_forecast,variable,start_lt,period,hindcast=False):
+    # addition to deaccumulate accumulation field or average instantaneous or daily fields.
+    # if accumulation field, take a difference
+    # Convention:
+    # time coordinate always represents the START of the period
+    # represented by each value.
+    time_resolution = argument_output.get_timeresolution(variable)
+    if 'accumulated' in time_resolution:
+        if not hindcast:
+            combined_forecast = accumulate_single_fc(combined_forecast,start_lt)
+        if hindcast:
+            accum = []
+            for fc_init, hc_set in combined_forecast.groupby('lag'):
+                hc_set = hc_set.assign_coords(fc_init=("time", hc_set.fc_init.isel(member=0).values))
+                for fc_init, hc_run in hc_set.groupby('fc_init'):
+                    hc_run_sum = accumulate_single_fc(hc_run,start_lt)
+                    accum.append(hc_run_sum)
+            combined_forecast = xr.concat(accum,dim='time').sortby('time')
+    else:
+        if not hindcast:
+            combined_forecast = average_single_fc(combined_forecast,period)
+        if hindcast:
+            averages = []
+            for fc_init, hc_set in combined_forecast.groupby('lag'):
+                hc_set = hc_set.assign_coords(fc_init=("time", hc_set.fc_init.isel(member=0).values))
+                for fc_init, hc_run in hc_set.groupby('fc_init'):
+                    hc_run_mean = average_single_fc(hc_run,period)
+                    averages.append(hc_run_mean)
+            combined_forecast = xr.concat(averages,dim='time').sortby('time')
+    return combined_forecast
+
 def create_initial_ecdsAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes):
     request_dict = {
             "class": "s2",
@@ -47,7 +100,7 @@ def create_initial_ecdsAPI_request(fcdate,grid,area,origin,webapi_param,leadtime
 
     return request_dict
 
-def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,fc_enslags,aggregation_switch,cleanup=True):
+def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,fc_enslags,start_lt,aggregation_switch,cleanup=True):
     # import registration detailis
     client = get_ecds_client()
     dataset = "s2s-forecasts"
@@ -110,35 +163,19 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         if result.returncode != 0:
             print(result.stderr)
             raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
-
+    
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # smae process following even with one forecast initialisation date to ensure same structure for all output. 
     combined_forecast = merge_lag_ensemble.merge_all_ens_members(f'{filename}',leveltype)
     
-    # addition to deaccumulate accumulation field or average instantaneous or daily fields.
-    # if accumulation field, take a difference
-    # Convention:
-    # time coordinate always represents the START of the period
-    # represented by each value.
+    # addition to deaccumulate accumulation field or average instantaneous or daily fields
     if aggregation_switch:
         time_resolution = argument_output.get_timeresolution(variable)
+        # if daily averaged field, shift time back one day
+        if time_resolution == 'averaged_24hrs':
+            combined_forecast = combined_forecast.assign_coords(time=combined_forecast.time - np.timedelta64(24, 'h'))
+        combined_forecast= aggregation_process(combined_forecast,variable,start_lt,period)
         time_label='time label denotes start of period'
-        if 'accumulated' in time_resolution:
-            start_times = combined_forecast.time.isel(time=slice(0, -1))
-            combined_forecast = combined_forecast.diff(dim='time')
-            combined_forecast = combined_forecast.assign_coords(time=start_times)
-        else:
-            # if not accumulated, work out average field, like weekly averages.
-            n_days = int(period[:-1])  # e.g. 7 for '7D'
-            # trim to complete periods
-            n_complete = (combined_forecast.sizes['time'] // n_days) * n_days
-            # Save start times before aggregation
-            start_times = combined_forecast.time.isel(time=slice(0, n_complete, n_days))
-            
-            combined_forecast = (combined_forecast.isel(time=slice(0, n_complete)).coarsen(time=n_days, boundary='trim').mean())
-            
-            # Force time coordinate to start of averaging period
-            combined_forecast = combined_forecast.assign_coords(time=start_times)
     else:
         time_label='no change made to variable timing'
 
@@ -180,7 +217,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     if cleanup:
         cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",)  
 
-def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,rf_enslags,rf_years,aggregation_switch,fc_time=True,cleanup=True):
+def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,rf_enslags,rf_years,start_lt,aggregation_switch,fc_time=True,cleanup=True):
     # to enable lagged ensemble, loop through requested ensembles
     # import registration details
     client = get_ecds_client()
@@ -276,33 +313,17 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     # same process following even with one forecast initialisation date to ensure same structure for all output. 
     combined_forecast = merge_lag_ensemble.merge_all_ens_hindcasts(f'{filename}_timeshifted',leveltype)
 
-    # addition to deaccumulate accumulation field or average instantaneous or daily fields.
-    # if accumulation field, take a difference
-    # Convention:
-    # time coordinate always represents the START of the period
-    # represented by each value.
+    # addition to deaccumulate accumulation field or average instantaneous or daily fields
     if aggregation_switch:
         time_resolution = argument_output.get_timeresolution(variable)
+        # if daily averaged field, shift time back one day
+        if time_resolution == 'averaged_24hrs':
+            combined_forecast = combined_forecast.assign_coords(time=combined_forecast.time - np.timedelta64(24, 'h'))
+        combined_forecast= aggregation_process(combined_forecast,variable,start_lt,period,hindcast=True)
         time_label='time label denotes start of period'
-        if 'accumulated' in time_resolution:
-            start_times = combined_forecast.time.isel(time=slice(0, -1))
-            combined_forecast = combined_forecast.diff(dim='time')
-            combined_forecast = combined_forecast.assign_coords(time=start_times)
-        else:
-            # if not accumulated, work out average field, like weekly averages.
-            n_days = int(period[:-1])  # e.g. 7 for '7D'
-            # trim to complete periods
-            n_complete = (combined_forecast.sizes['time'] // n_days) * n_days
-            # Save start times before aggregation
-            start_times = combined_forecast.time.isel(time=slice(0, n_complete, n_days))
-
-            combined_forecast = (combined_forecast.isel(time=slice(0, n_complete)).coarsen(time=n_days, boundary='trim').mean())
-
-            # Force time coordinate to start of averaging period
-            combined_forecast = combined_forecast.assign_coords(time=start_times)
     else:
         time_label='no change made to variable timing'
-
+    
     # before saving, put in request attributes
     metadata = {'Conventions': 'CF-1.8',
                     'title': f'{origin} Sub-seasonal Reforecast',
@@ -343,18 +364,25 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     if cleanup:
         cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",f'{filename}_timeshifted')
 
-def rf_shifttime(fn,output_fn,lag,shift_days=0):
-    orig_hc = xr.open_dataset(fn,engine='cfgrib')
-    if np.size(orig_hc['step'].values) > 1: # different option depending on size of step variable.
-        orig_hc_new = orig_hc.stack(valid_time=("time","step")).drop_vars(["time","step"]).assign_coords(valid_time=orig_hc.valid_time.values.ravel()) # have a valid_time coordinate instead
+def rf_shifttime(fn, output_fn, lag, shift_days=0):
+    '''
+    Shift time so it is aligned with fc_init_date. Additionally, keep forecast date information
+    '''
+    orig_hc = xr.open_dataset(fn, engine='cfgrib')
+    if np.size(orig_hc['step'].values) > 1:
+        fc_init = np.repeat(orig_hc.time.values,len(orig_hc.step))
+
+        orig_hc_new = (orig_hc.stack(valid_time=("time", "step")).drop_vars(["time", "step"]).assign_coords(
+                valid_time=orig_hc.valid_time.values.ravel(),fc_init=("valid_time", fc_init),))
     else:
-        orig_hc_new = orig_hc.swap_dims({'time':'valid_time'})
+        orig_hc_new = orig_hc.swap_dims({'time': 'valid_time'})
         orig_hc_new = orig_hc_new.drop_vars("time")
 
-    orig_hc_new = orig_hc_new.assign_coords(
-            valid_time=orig_hc_new.valid_time+np.timedelta64(shift_days,'D')
-            )
-    orig_hc_new = orig_hc_new.rename({'valid_time':'time'})
+        orig_hc_new = orig_hc_new.assign_coords(fc_init=("valid_time", orig_hc.time.values))
+
+    orig_hc_new = orig_hc_new.assign_coords(valid_time=orig_hc_new.valid_time + np.timedelta64(shift_days, 'D'))
+
+    orig_hc_new = orig_hc_new.rename({'valid_time': 'time'})
     orig_hc_new = orig_hc_new.assign_coords(lag=lag)
     orig_hc_new.to_netcdf(output_fn)
 
