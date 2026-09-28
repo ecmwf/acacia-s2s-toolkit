@@ -25,10 +25,11 @@ Contents
 --------
 .. toctree::
    :maxdepth: 1
-   :caption: Core
+   :caption: Core Toolkit Functions
 
    Installation
    download_forecasts
+   models
    download_reforecast
 
 .. toctree::
@@ -42,8 +43,9 @@ Contents
 
 .. toctree::
    :maxdepth: 1
-   :caption: Other
+   :caption: Theory
 
+   subseasonal_forecasting
    api
    tips_faq
    
