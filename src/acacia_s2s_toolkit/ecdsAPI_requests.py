@@ -14,6 +14,7 @@ import glob
 from pathlib import Path
 import acacia_s2s_toolkit
 import json
+import pandas as pd
 
 def get_ecds_client():
     os.environ["CDSAPI_RC"] = os.path.expanduser("~/.cdsapirc.ecds")
@@ -48,36 +49,35 @@ def average_single_fc(fc,period):
     fc = fc.assign_coords(time=start_times)
     return fc
 
-def aggregation_process(combined_forecast,variable,start_lt,period,hindcast=False):
+def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
     # addition to deaccumulate accumulation field or average instantaneous or daily fields.
     # if accumulation field, take a difference
     # Convention:
     # time coordinate always represents the START of the period
     # represented by each value.
     time_resolution = argument_output.get_timeresolution(variable)
-    if 'accumulated' in time_resolution:
-        if not hindcast:
-            combined_forecast = accumulate_single_fc(combined_forecast,start_lt)
-        if hindcast:
-            accum = []
-            for fc_init, hc_set in combined_forecast.groupby('lag'):
-                hc_set = hc_set.assign_coords(fc_init=("time", hc_set.fc_init.isel(member=0).values))
-                for fc_init, hc_run in hc_set.groupby('fc_init'):
-                    hc_run_sum = accumulate_single_fc(hc_run,start_lt)
-                    accum.append(hc_run_sum)
-            combined_forecast = xr.concat(accum,dim='time').sortby('time')
+    if not hindcast:
+        if 'accumulated' in time_resolution:
+            forecast = accumulate_single_fc(forecast,start_lt)
+        else:
+            forecast = average_single_fc(forecast,period)
     else:
-        if not hindcast:
-            combined_forecast = average_single_fc(combined_forecast,period)
-        if hindcast:
-            averages = []
-            for fc_init, hc_set in combined_forecast.groupby('lag'):
+        processed_hindcasts = []
+        for lag, hc_set in forecast.groupby('lag'):
+            if 'member' in hc_set.fc_init.dims: # add to handle one-lag reforecasts
                 hc_set = hc_set.assign_coords(fc_init=("time", hc_set.fc_init.isel(member=0).values))
-                for fc_init, hc_run in hc_set.groupby('fc_init'):
-                    hc_run_mean = average_single_fc(hc_run,period)
-                    averages.append(hc_run_mean)
-            combined_forecast = xr.concat(averages,dim='time').sortby('time')
-    return combined_forecast
+            for fc_init, hc_run in hc_set.compute().groupby('fc_init'):
+                if 'accumulated' in time_resolution:
+                    hc_run_processed = accumulate_single_fc(hc_run,start_lt)
+                else:
+                    hc_run_processed = average_single_fc(hc_run,period)
+                processed_hindcasts.append(hc_run_processed)
+        forecast = xr.concat(processed_hindcasts,dim='time').sortby('time')
+        if isinstance(forecast.indexes["member"], pd.MultiIndex):
+            forecast = (forecast.reset_index("member", drop=True)
+                           .assign_coords(member=np.arange(forecast.sizes["member"])))
+
+    return forecast
 
 def create_initial_ecdsAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes):
     request_dict = {
