@@ -248,12 +248,12 @@ def download_forecast(variable,
             if verbose:
                 ecdsAPI_requests.request_forecast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,
                                                   data_format,webapi_param,leadtime_hour,period,
-                                                  leveltype,filename_save,plevs,fc_enslags,aggregation_switch,cleanup=cleanup)
+                                                  leveltype,filename_save,plevs,fc_enslags,start_lt,aggregation_switch,cleanup=cleanup)
             else:
                 with SuppressOutput():
                     ecdsAPI_requests.request_forecast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,
                                                   data_format,webapi_param,leadtime_hour,period,
-                                                  leveltype,filename_save,plevs,fc_enslags,aggregation_switch,cleanup=cleanup)
+                                                  leveltype,filename_save,plevs,fc_enslags,start_lt,aggregation_switch,cleanup=cleanup)
         except Exception:
             print(f"[ERROR] Download failed for {filename_save}")
             raise
