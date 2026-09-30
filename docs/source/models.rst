@@ -7,15 +7,18 @@ Models
 Available models
 -------------------
 
-A full summary of models can be found on the ECMWF `confluence page <https://confluence.ecmwf.int/display/S2S/Models>`_.  (labels to be added to the following screenshot to guide users on how to use the table)
+A full summary of models can be found on the ECMWF `confluence page <https://confluence.ecmwf.int/display/S2S/Models>`_.  An example is shown below:
 
-.. image:: models.png
+.. image:: models-annotated.png
    :alt: Models available to ECMWF database
    :align: center
 
+Image: where to find helpful information about the models available in the ECMWF database.  This is an example; please visit the link above for up-to-date 'live' information.
 
-Model Characteristics and Differences
+Model Characteristics
 -------------------
+
+The models differ from eachother in many ways, including: 
 
 - **Forecast frequency**: All models are initialised on a Thursday.  Beyond that, met services will vary when they initialise again on different days, with different frequencies. 
 - **Ensemble size**: Ensemble size varies across models. 
