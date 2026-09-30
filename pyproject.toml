@@ -1,11 +1,12 @@
 [project]
+# Derive the version from Git tags and commits.
+dynamic = ["version"]
 name = "acacia_s2s_toolkit"
 authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
   {name="Innocent Masukwedza", email="g.t.masukwedza@reading.ac.uk"},
   {name="Piotr Wolski",email="wolski@csag.uct.ac.za"}
 ]
-version = "2.41"
 description = "A python package to support download and analysis of forecasts from S2S prediction project database."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -39,10 +40,12 @@ Homepage = "https://github.com/ecmwf/acacia-s2s-toolkit"
 
 # build system
 [build-system]
-requires = ["setuptools","wheel"]
+requires = ["setuptools>=64", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-data = { "acacia_s2s_toolkit.lookup_tables" = ["*.csv"] }
 
-
+[tool.setuptools_scm]
+# Generate the version file during installation or building.
+version_file = "src/acacia_s2s_toolkit/_version.py"
