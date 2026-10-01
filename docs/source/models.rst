@@ -16,7 +16,7 @@ A full summary of models can be found on the ECMWF `confluence page <https://con
 Image: where to find helpful information about the models available in the ECMWF database.  This is an example; please visit the link above for up-to-date 'live' information.
 
 Model Characteristics
--------------------
+-----------------------
 
 The models differ from eachother in many ways, including: 
 
