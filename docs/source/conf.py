@@ -46,3 +46,7 @@ autodoc_mock_imports = ["esmpy", "xesmf"]
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
+
+exclude_patterns = [
+    'notebooks/*.ipynb',
+]
