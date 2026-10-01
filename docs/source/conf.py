@@ -22,8 +22,8 @@ html_theme = "sphinx_rtd_theme"
 extensions = [
     'sphinx.ext.duration',
     'sphinx.ext.doctest',
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
+    #'sphinx.ext.autodoc',
+    #'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     'nbsphinx',
     'myst_nb'
@@ -49,4 +49,5 @@ epub_show_urls = 'footnote'
 
 exclude_patterns = [
     'notebooks/*.ipynb',
+    'api.rst',
 ]
