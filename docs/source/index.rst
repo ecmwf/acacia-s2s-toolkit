@@ -38,7 +38,6 @@ Contents
    :maxdepth: 1
    :caption: Example notebooks
 
-..
    notebooks/deterministic_forecast_example
    notebooks/probabilistic_forecast_example
    notebooks/bias_correction_example
@@ -49,6 +48,7 @@ Contents
    :caption: Theory
 
    subseasonal_forecasting
-   api
    tips_faq
+..   
+   api
    
