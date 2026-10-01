@@ -5,7 +5,7 @@ What is Subseasonal Forecasting?
     This is a tool being developed by the ACACIA project. Please email feedback to k.bartholomew@metoffice.co.uk
 
 What is Subseasonal Forecasting?
--------------------
+---------------------------------
 
 A weather forecast takes initial atmospheric conditions such as temperature, pressure, and wind speed and uses a dyamical model to predict how those conditions will evolve over time.  This relies on accurate knowledge of initial atmospheric conditions, which can never be perfect, so weather forecasts lose useful skill beyond a lead time of about 5-10 days.
 
