@@ -49,6 +49,4 @@ Contents
 
    subseasonal_forecasting
    tips_faq
-..   
-   api
    
