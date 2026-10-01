@@ -45,7 +45,7 @@ def download_hindcast(variable,
                       grid="1.5x1.5",
                       rf_enslags=None,
                       rf_years=None,
-                      fc_time=True,
+                      fc_time=False,
                       overwrite=False,
                       verbose=True,
                       cleanup=True):

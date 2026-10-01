@@ -14,18 +14,31 @@ def cleanup_idx_files(filename_prefix):
         if path.is_file():
             path.unlink()
 
-def refine_combined_array(combined,leveltype):
-    if leveltype == 'pressure':
-        if 'isobaricInhPa' in combined.dims:
-            combined = combined.rename({'isobaricInhPa':'level'})
-        # Only transpose dims that actually exist
-        combined = combined.transpose(
-            *[d for d in ['time','member','level','latitude','longitude'] if d in combined.dims]
-        )
+def refine_combined_array(combined,leveltype,rf=False):
+    if rf:
+        if leveltype == 'pressure':
+            if 'isobaricInhPa' in combined.dims:
+                combined = combined.rename({'isobaricInhPa':'level'})
+            # Only transpose dims that actually exist
+            combined = combined.transpose(
+                *[d for d in ['hc_init_date','step','member','level','latitude','longitude'] if d in combined.dims]
+            )
+        else:
+            combined = combined.transpose(
+                *[d for d in ['hc_init_date','step','member','latitude','longitude'] if d in combined.dims]
+            )
     else:
-        combined = combined.transpose(
-            *[d for d in ['time','member','latitude','longitude'] if d in combined.dims]
-        )
+        if leveltype == 'pressure':
+            if 'isobaricInhPa' in combined.dims:
+                combined = combined.rename({'isobaricInhPa':'level'})
+            # Only transpose dims that actually exist
+            combined = combined.transpose(
+                *[d for d in ['time','member','level','latitude','longitude'] if d in combined.dims]
+            )
+        else:
+            combined = combined.transpose(
+                *[d for d in ['time','member','latitude','longitude'] if d in combined.dims]
+            )
     return combined
 
 def merge_all_ens_members(filename,leveltype):
@@ -71,14 +84,10 @@ def merge_all_ens_members(filename,leveltype):
     return combined
 
 def merge_all_ens_hindcasts(filename,leveltype):
-    all_fcs = xr.open_mfdataset(f'{filename}_allens_*',combine='nested',concat_dim='lag') # open mfdataset but have fc_init_member as a dimension, i.e. number of forecast initialisations used.
+    all_fcs = xr.open_mfdataset(f'{filename}_allens_*',combine='nested') # open mfdataset but have fc_init_member as a dimension, i.e. number of forecast initialisations used.
+    all_fcs = all_fcs.rename({'number': 'member'})
 
-    if "lag" not in all_fcs.dims:
-        all_fcs = all_fcs.expand_dims("lag") # expand a fc_init_member if only one file is download. it will have a dimension of 1. 
-
-    combined = all_fcs.stack(member=("lag", "number"))
-
-    combined = refine_combined_array(combined,leveltype)
+    combined = refine_combined_array(all_fcs,leveltype,rf=True)
 
     return combined
 

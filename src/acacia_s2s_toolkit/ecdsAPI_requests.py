@@ -27,26 +27,30 @@ def cleanup_patterns(*patterns):
             if path.is_file():
                 path.unlink()
 
-def accumulate_single_fc(fc,start_lt):
-    start_times = fc.time.isel(time=slice(0, -1))
-    fc = fc.diff(dim='time')
-    fc = fc.assign_coords(time=start_times)
+def accumulate_single_fc(fc, start_lt):
+    dim = 'step' if 'step' in fc.dims else 'time'
+    start_coords = fc[dim].isel({dim: slice(0, -1)})
+    fc = fc.diff(dim=dim)
+    fc = fc.assign_coords({dim: start_coords})
     # First interval is only needed to establish the accumulation
     # at start_lt, so remove it from the output.
     if start_lt > 0:
-        fc = fc.isel(time=slice(1, None))
+        fc = fc.isel({dim: slice(1, None)})
     return fc
 
-def average_single_fc(fc,period):
-    # if not accumulated, work out average field, like weekly averages.
-    n_days = int(period[:-1])  # e.g. 7 for '7D'
+
+def average_single_fc(fc, period):
+    dim = 'step' if 'step' in fc.dims else 'time'
+    # e.g. '7D' -> 7
+    n_days = int(period[:-1])
     # trim to complete periods
-    n_complete = (fc.sizes['time'] // n_days) * n_days
-    # Save start times before aggregation
-    start_times = fc.time.isel(time=slice(0, n_complete, n_days))
-    fc = (fc.isel(time=slice(0, n_complete)).coarsen(time=n_days, boundary='trim').mean())
-    # Force time coordinate to start of averaging period
-    fc = fc.assign_coords(time=start_times)
+    n_complete = (fc.sizes[dim] // n_days) * n_days
+    # Save start coordinate before aggregation
+    start_coords = fc[dim].isel({dim: slice(0, n_complete, n_days)})
+
+    fc = (fc.isel({dim: slice(0, n_complete)}).coarsen({dim: n_days}, boundary='trim').mean())
+    # Force coordinate to start of averaging period
+    fc = fc.assign_coords({dim: start_coords})
     return fc
 
 def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
@@ -63,19 +67,13 @@ def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
             forecast = average_single_fc(forecast,period)
     else:
         processed_hindcasts = []
-        for lag, hc_set in forecast.groupby('lag'):
-            if 'member' in hc_set.fc_init.dims: # add to handle one-lag reforecasts
-                hc_set = hc_set.assign_coords(fc_init=("time", hc_set.fc_init.isel(member=0).values))
-            for fc_init, hc_run in hc_set.compute().groupby('fc_init'):
-                if 'accumulated' in time_resolution:
-                    hc_run_processed = accumulate_single_fc(hc_run,start_lt)
-                else:
-                    hc_run_processed = average_single_fc(hc_run,period)
-                processed_hindcasts.append(hc_run_processed)
-        forecast = xr.concat(processed_hindcasts,dim='time').sortby('time')
-        if isinstance(forecast.indexes["member"], pd.MultiIndex):
-            forecast = (forecast.reset_index("member", drop=True)
-                           .assign_coords(member=np.arange(forecast.sizes["member"])))
+        for hc_init, hc_run in forecast.groupby('hc_init_date'):
+            if 'accumulated' in time_resolution:
+                hc_run_processed = accumulate_single_fc(hc_run,start_lt)
+            else:
+                hc_run_processed = average_single_fc(hc_run,period)
+            processed_hindcasts.append(hc_run_processed)
+        forecast = xr.concat(processed_hindcasts,dim='hc_init_date').sortby('hc_init_date')
 
     return forecast
 
@@ -217,7 +215,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     if cleanup:
         cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",)  
 
-def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,rf_enslags,rf_years,start_lt,aggregation_switch,fc_time=True,cleanup=True):
+def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,leadtime_hour,period,leveltype,filename,plevs,rf_enslags,rf_years,start_lt,aggregation_switch,fc_time=False,cleanup=True):
     # to enable lagged ensemble, loop through requested ensembles
     # import registration details
     client = get_ecds_client()
@@ -318,7 +316,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         time_resolution = argument_output.get_timeresolution(variable)
         # if daily averaged field, shift time back one day
         if time_resolution == 'averaged_24hrs':
-            combined_forecast = combined_forecast.assign_coords(time=combined_forecast.time - np.timedelta64(24, 'h'))
+            combined_forecast = combined_forecast.assign_coords(step=combined_forecast.step - np.timedelta64(1, 'D'))
         combined_forecast= aggregation_process(combined_forecast,variable,start_lt,period,hindcast=True)
         time_label='time label denotes start of period'
     else:
@@ -328,12 +326,8 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     metadata = {
         'Conventions': 'CF-1.8',
         'title': f'{origin} Sub-seasonal Reforecast',
-
-        # IM comments
         'institution': origin,  # Identify the forecast-producing centre using its origin code
         'data_host': 'ECMWF',   # Identify the data host separately from the forecast producer
-        # 'institution': 'ECMWF', this cant be hardcorded. ive changed it to data host
-        # 'origin': origin,
 
         # Identify the data source and record when processing completed.
         'source': f'{origin} S2S reforecasts downloaded from ECMWF ECDS',
@@ -341,15 +335,9 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
             f'{datetime.utcnow():%Y-%m-%dT%H:%M:%SZ} '
             'Downloaded and processed using acacia_s2s_toolkit'
         ),
-        # replaced by above
-        # 'source': 'Downloaded via acacia_s2s_toolkit',
-        # 'history': 'Downloaded via acacia_s2s_toolkit',
 
         # Record the software name and version used.
         'toolkit': f'acacia_s2s_toolkit {acacia_s2s_toolkit.__version__}',
-        # replaced by above
-        # 'toolkit': 'acacia_s2s_toolkit',
-        # 'toolkit_version': acacia_s2s_toolkit.__version__,
 
         'variable': variable,
         'grid': grid,
@@ -363,9 +351,6 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         'reforecast_years': ','.join(map(str, np.atleast_1d(rf_years))),
         'leadtime_hour': ','.join(map(str, np.atleast_1d(leadtime_hour))),
         'lag_ensemble_days': ','.join(map(str, np.atleast_1d(rf_enslags))),
-        # 'lag_ensemble_days': ','.join(
-        #     map(str, np.atleast_1d(rf_enslags))
-        # ), redundant
         'period': period,
 
         'fctime': str(fc_time),
@@ -381,36 +366,26 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     
     combined_forecast.to_netcdf(f'{filename}.nc')
 
-	# IM comment
     # Remove intermediate files after saving the final NetCDF.
     # The trailing wildcard includes all timeshifted ensemble files.
     if cleanup:
         cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",f'{filename}_timeshifted*')
 		
-# IM comments
 # Explicitly decode forecast lead times as timedeltas by default to avoid the xarray FutureWarning.
-# the original code def rf_shifttime(fn,w output_fn, lag, shift_days=0, decode_timedelta=True): has been changed to below line
 def rf_shifttime(fn, output_fn, lag, shift_days=0, decode_timedelta=True):
     '''
     Shift time so it is aligned with fc_init_date. Additionally, keep forecast date information
     '''
-    orig_hc = xr.open_dataset(fn, engine='cfgrib', decode_timedelta=decode_timedelta) # change has been added here
-    if np.size(orig_hc['step'].values) > 1:
-        fc_init = np.repeat(orig_hc.time.values,len(orig_hc.step))
+    orig_hc = xr.open_dataset(fn, engine='cfgrib', decode_timedelta=decode_timedelta) # take the original rfc
+    lag_shift = np.timedelta64(shift_days, 'D') # compute a shift lag given requested shift days
 
-        orig_hc_new = (orig_hc.stack(valid_time=("time", "step")).drop_vars(["time", "step"]).assign_coords(
-                valid_time=orig_hc.valid_time.values.ravel(),fc_init=("valid_time", fc_init),))
-    else:
-        orig_hc_new = orig_hc.swap_dims({'time': 'valid_time'})
-        orig_hc_new = orig_hc_new.drop_vars("time")
+    orig_hc_new = orig_hc.rename({'time': 'hc_init_date'}) # change name of time to hc_init_date
 
-        orig_hc_new = orig_hc_new.assign_coords(fc_init=("valid_time", orig_hc.time.values))
+    orig_hc_new = orig_hc_new.assign_coords(step=orig_hc_new.step + lag_shift) # have step shifted by lag_shift, i.e. if leadtime = 5 days, but reforecast is a day ahead, shift step back by a day, i.e. 4 days.
 
-    orig_hc_new = orig_hc_new.assign_coords(valid_time=orig_hc_new.valid_time + np.timedelta64(shift_days, 'D'))
+    orig_hc_new = orig_hc_new.assign_coords(valid_time=(('hc_init_date', 'step'),orig_hc_new.hc_init_date.values[:, None] + orig_hc_new.step.values[None, :])) # assign a valid time coordinate thats based on new step and the hc_init_date.
 
-    orig_hc_new = orig_hc_new.rename({'valid_time': 'time'})
-    orig_hc_new = orig_hc_new.assign_coords(lag=lag)
-    orig_hc_new.to_netcdf(output_fn)
+    orig_hc_new.to_netcdf(output_fn) # save as netcdf
 
 def set_cf_to_pf(input_file, output_file):
     # Open input file
@@ -463,5 +438,3 @@ def add_zero_time(input_file, output_file):
                     break
                 ec.codes_write(gid, fout)
                 ec.codes_release(gid)
-
-
