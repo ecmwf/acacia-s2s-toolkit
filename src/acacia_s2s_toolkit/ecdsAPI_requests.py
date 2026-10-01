@@ -323,35 +323,56 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         time_label='time label denotes start of period'
     else:
         time_label='no change made to variable timing'
-    
+
     # before saving, put in request attributes
-    metadata = {'Conventions': 'CF-1.8',
-                    'title': f'{origin} Sub-seasonal Reforecast',
-                    'institution': 'ECMWF',
-                    'source': 'Downloaded via acacia_s2s_toolkit',
-                    'history': 'Downloaded via acacia_s2s_toolkit',
-                    'toolkit': 'acacia_s2s_toolkit',
-                    'toolkit_version': acacia_s2s_toolkit.__version__,
-                    'forecast_initialisation_date': str(fcdate),
-                    'origin': origin,
-                    'grid': grid,
-                    'variable': variable,
-                    'leadtime_hour': ','.join(map(str, np.atleast_1d(leadtime_hour))),
-                    'period': period,
-                    'leveltype': leveltype,
-                    'timelabel': time_label,
-                    'lag_ensemble_days': ','.join(map(str, np.atleast_1d(rf_enslags))),
-                    'reforecast_years': ','.join(map(str, np.atleast_1d(rf_years))),
-                    'fctime': str(fc_time),
-                    'pressure_levels': (
-                        '' if plevs is None
-                        else ','.join(map(str, np.atleast_1d(plevs)))
-                    ),
-                    'lag_ensemble_days': ','.join(
-                        map(str, np.atleast_1d(rf_enslags))
-                    ),
-                    'aggregation_applied': str(aggregation_switch),
-                    'data_format': data_format,}
+    metadata = {
+        'Conventions': 'CF-1.8',
+        'title': f'{origin} Sub-seasonal Reforecast',
+
+        # IM comments
+        'institution': origin,  # Identify the forecast-producing centre using its origin code
+        'data_host': 'ECMWF',   # Identify the data host separately from the forecast producer
+        # 'institution': 'ECMWF', this cant be hardcorded. ive changed it to data host
+        # 'origin': origin,
+
+        # Identify the data source and record when processing completed.
+        'source': f'{origin} S2S reforecasts downloaded from ECMWF ECDS',
+        'history': (
+            f'{datetime.utcnow():%Y-%m-%dT%H:%M:%SZ} '
+            'Downloaded and processed using acacia_s2s_toolkit'
+        ),
+        # replaced by above
+        # 'source': 'Downloaded via acacia_s2s_toolkit',
+        # 'history': 'Downloaded via acacia_s2s_toolkit',
+
+        # Record the software name and version used.
+        'toolkit': f'acacia_s2s_toolkit {acacia_s2s_toolkit.__version__}',
+        # replaced by above
+        # 'toolkit': 'acacia_s2s_toolkit',
+        # 'toolkit_version': acacia_s2s_toolkit.__version__,
+
+        'variable': variable,
+        'grid': grid,
+        'leveltype': leveltype,
+        'pressure_levels': (
+            '' if plevs is None
+            else ','.join(map(str, np.atleast_1d(plevs)))
+        ),
+
+        'forecast_initialisation_date': str(fcdate),
+        'reforecast_years': ','.join(map(str, np.atleast_1d(rf_years))),
+        'leadtime_hour': ','.join(map(str, np.atleast_1d(leadtime_hour))),
+        'lag_ensemble_days': ','.join(map(str, np.atleast_1d(rf_enslags))),
+        # 'lag_ensemble_days': ','.join(
+        #     map(str, np.atleast_1d(rf_enslags))
+        # ), redundant
+        'period': period,
+
+        'fctime': str(fc_time),
+        'timelabel': time_label,
+        'aggregation_applied': str(aggregation_switch),
+        'data_format': data_format,
+    }
     
     combined_forecast.attrs.update(metadata)
 
@@ -360,15 +381,20 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
     
     combined_forecast.to_netcdf(f'{filename}.nc')
 
-    # remove previous files  
+	# IM comment
+    # Remove intermediate files after saving the final NetCDF.
+    # The trailing wildcard includes all timeshifted ensemble files.
     if cleanup:
-        cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",f'{filename}_timeshifted')
-
-def rf_shifttime(fn, output_fn, lag, shift_days=0):
+        cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",f'{filename}_timeshifted*')
+		
+# IM comments
+# Explicitly decode forecast lead times as timedeltas by default to avoid the xarray FutureWarning.
+# the original code def rf_shifttime(fn,w output_fn, lag, shift_days=0, decode_timedelta=True): has been changed to below line
+def rf_shifttime(fn, output_fn, lag, shift_days=0, decode_timedelta=True):
     '''
     Shift time so it is aligned with fc_init_date. Additionally, keep forecast date information
     '''
-    orig_hc = xr.open_dataset(fn, engine='cfgrib')
+    orig_hc = xr.open_dataset(fn, engine='cfgrib', decode_timedelta=decode_timedelta) # change has been added here
     if np.size(orig_hc['step'].values) > 1:
         fc_init = np.repeat(orig_hc.time.values,len(orig_hc.step))
 
