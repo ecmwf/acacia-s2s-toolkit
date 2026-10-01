@@ -9,7 +9,7 @@ Available models
 
 A full summary of models can be found on the ECMWF `confluence page <https://confluence.ecmwf.int/display/S2S/Models>`_.  An example is shown below:
 
-.. image:: models-annotated.png
+.. image:: models.png
    :alt: Models available to ECMWF database
    :align: center
 
