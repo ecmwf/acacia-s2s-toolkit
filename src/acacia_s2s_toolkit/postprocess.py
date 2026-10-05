@@ -14,7 +14,21 @@ import pooch
 autodoc_mock_imports = ["esmpy", "xesmf", "netCDF4"]
 
 #this determines with functions will be publicly visible in the installed package
-__all__=["postprocess_forecast","get_example_data","load_raw_data"]
+__all__=["postprocess_forecast",
+         "get_example_data",
+         "load_raw_data", 
+         "read_netcdf", 
+         "add_enslag",
+         "deaccumulate",
+         "align_grid",
+         "set_verbose",
+         "align_time",
+         "organize_by_leadtime",
+         "_log",
+         "aggregate",
+         "leadtime_to_time",
+         "organize_by_validtime"
+        ]
 
 #######################################################################################
 
@@ -28,7 +42,7 @@ VERBOSE = True
 def set_verbose(v):
     global VERBOSE
     VERBOSE = v
-    print("logging is {}".format(v))
+    print("verbosity is {}".format(v))
 
 
 def _log(msg, force=False):
@@ -253,35 +267,39 @@ def read_netcdf(file, variable):
 
 
 
-def accumulated_to_daily(accum):
+
+
+
+
+def deaccumulate(accum):
     """
     Convert accumulated values (e.g. precipitation) to daily totals.
-
+    
     Midnight (00:00) accumulation values are differenced to obtain daily
     totals. Because the value at 00:00 represents accumulation over the
     *previous* day, the first value is reinserted and timestamps are
     shifted back by one day so that each value corresponds to the correct
     accumulation period.
-
+    
     For hindcasts, the first day of each hindcast cycle is removed from 
     daily totals series to avoid artificial negative differences that 
     arise when differencing across hindcast boundaries.
-
+    
     Parameters
     ----------
     accum : xarray.DataArray or xarray.Dataset
         Accumulated values with a ``time`` coordinate.
-
+    
     Returns
     -------
     xarray.DataArray or xarray.Dataset
         Daily totals with timestamps representing the day of accumulation.
     """
-
+    
     _log("\n" + "="*60)
     _log(" START: accumulated_to_daily ".center(60, "="))
     _log("="*60 + "\n")
-
+    
     # Select midnight values (00:00) in case data are sub=daily, would it work for staggered initializations?
     _log("Selecting midnight accumulation values...")
     
@@ -289,10 +307,16 @@ def accumulated_to_daily(accum):
     
     # Calculate day-to-day differences
     _log("Computing day-to-day differences...")
-    # we use this instead of diff(). With diff() if data has N time steps, there is only N-1 time steps after diff().
-    # to go back do N - we would need to concatenate the first time step to the output
-    # this one just leaves the original date in, and fills it with NaN, so there is still N time steps in the array
-    daily = midnight - midnight.shift(time=1)
+    daily = midnight.diff("time")
+
+    #to get rid of negative values
+    dailypositveonly=daily.where(daily>=0,0)
+
+    #but have to bring nans back
+    daily=dailypositveonly.where(~np.isnan(daily))
+    
+    #have to add the first day back
+    daily = daily.reindex(time=midnight.time, fill_value=np.nan)
     
     _log("Detecting cycle starts...")
     
@@ -300,31 +324,27 @@ def accumulated_to_daily(accum):
     # In daily data for staggered hindasts these days will be NaNs anyway.
     # using diff here
     time_gap = midnight.time.diff("time") > np.timedelta64(1, "D")
-    #because adding back the lost first time step is easy since we fill the first day with True
+    
+    #need to add the first day back
     time_gap = time_gap.reindex(time=midnight.time, fill_value=True)
+        
+    #dropping time gaps - these are days that are "initialization days", i.e. for which accumulated rainfall was not given, i.e. where it was 0
+    #in staggered hindcasts - these will be nans already, because diff() gives nan if the previous day was nan
+    daily=daily.isel(time=np.where(~time_gap)[0])
     
-    #this catches all nans in staggered hindcasts, so also first day nans 
-    nan_gap = midnight.shift(time=1).isnull()
-
-    #merging detected nans
-    all_gaps = time_gap | nan_gap
-    
-    _log("Replacing missing differences...")
-    #in staggered hindcast - first days of each cycle will be replaced by original accumulated value, other nans will be replaced by nans
-    #in non staggered hindcasts - the first days of the cycle will be replaced by original accumulated value
-    daily = daily.where(~all_gaps, midnight)
-
     # Shift timestamps back by one day - this is done so that a value for a particular date represents the total over that date. The time stamp
     # is kept to be at 00:00, but this is no longer the previous day accumulation.
-    _log("Shifting timestamps to represent accumulation day...")
-    daily["time"] = daily.indexes["time"] - pd.DateOffset(days=1)
-
+    _log("Shifting timestamps to represent accumulation day...")    
+    daily["time"] = daily.indexes["time"] - pd.DateOffset(days=0.5)
+    
     daily=daily.transpose("time","member","lat","lon")
     _log("all done")
     _log("\n" + "="*60+"\n")
-
-    return daily
     
+    return daily
+
+
+
 
 
 def align_grid(finegrid, coarsegrid, direction="fine_to_coarse", method="conservative", raise_if_missing=True, threshold=0.9):
@@ -414,7 +434,11 @@ def align_grid(finegrid, coarsegrid, direction="fine_to_coarse", method="conserv
 
 
 
-def align_time(obs, hindcast, raise_if_missing=True):
+
+
+
+
+def align_time(obs, hindcast, add_members=False, raise_if_missing=True):
     """
     Align two datasets in time by selecting timestamps from the coarse grid dataset.
 
@@ -476,24 +500,28 @@ def align_time(obs, hindcast, raise_if_missing=True):
             ))
     else:
         _log("Time coverage verified: obs fully covers hindcast period.")
-    #construct pseudo-members in obs data corresponding to hindcast members
-    pseudo_members=[]
-    for m in hindcastaligned.member.values:
-        member_data = hindcastaligned.sel(member=m)
 
-        # valid timestep if any gridcell is non-nan
-        valid = ~np.isnan(member_data).all(("lat", "lon"))    
-        #select obs values for valid data
-        pseudo_member=obsaligned.sel(time=valid)
-        pseudo_member=pseudo_member.expand_dims(dim={"member":[m]})
-        pseudo_members.append(pseudo_member)
-
-    obsaligned = xr.concat(
-        pseudo_members,
-        dim="member",
-        join="outer"
-    )
-    obsaligned=obsaligned.transpose("time","member","lat","lon")
+    if add_members:
+        #construct pseudo-members in obs data corresponding to hindcast members
+        pseudo_members=[]
+        for m in hindcastaligned.member.values:
+            member_data = hindcastaligned.sel(member=m)
+    
+            # valid timestep if any gridcell is non-nan
+            valid = ~np.isnan(member_data).all(("lat", "lon"))    
+            #select obs values for valid data
+            pseudo_member=obsaligned.sel(time=valid)
+            pseudo_member=pseudo_member.expand_dims(dim={"member":[m]})
+            pseudo_members.append(pseudo_member)
+    
+        obsaligned = xr.concat(
+            pseudo_members,
+            dim="member",
+            join="outer",
+            coords=["enslag"]
+        )
+        obsaligned=obsaligned.transpose("time","member","lat","lon")
+        
     
     _log("\n" + "="*60+"\n")
 
@@ -501,37 +529,145 @@ def align_time(obs, hindcast, raise_if_missing=True):
     return obsaligned, hindcastaligned
 
 
-    
-def organize_by_leadtime(data, agg_window="1D", agg_method="sum", drop_members=False):
-    """
-    Reshape data into (lead_time, init_time, lat, lon, member),
-    supporting multiple initializations inside a single file.
 
+
+
+def leadtime_to_time(data, drop_member=False):
+    
+    _log("finding first date for each member")
+    
+    enslag=data["enslag"] #in days
+    member=data["member"]
+    nominal_time=data["nominal_time"]
+    lead_time=data["lead_time"]
+    
+    enslag_by_member = data.isel(nominal_time=0)["enslag"]
+     
+    _log("combining members with nominal_time")
+    
+    result = []
+    for m in member.values:
+        lag = pd.to_timedelta(enslag.sel(member=m), "D")
+        # original lag is calculated as init_time-nominal_time  
+        #- so dates before nominal_time have lag of -1, dates after have lag of 1
+        # to recover init_time from nominal_time - it is nominal_time + lag
+        init_time = nominal_time + lag
+        times = np.array([x + pd.to_timedelta(lead_time.data, "D") for x in init_time.data]).flatten()
+        
+        timedata = data.sel(member=m).stack(time=("nominal_time", "lead_time"))
+        timedata = timedata.reset_index("time", drop=True)
+        timedata = timedata.drop_vars(
+            [c for c in timedata.coords if c not in ("lat", "lon", "time")],
+            errors="ignore"
+        )
+        timedata = timedata.assign_coords(time=times)
+        #memdata = memdata.rename(memdata="valid_time")
+        
+        result.append(timedata)
+    
+    combined = xr.concat(result, dim="member", join="outer")
+    combined = combined.assign_coords(member=member.values)
+    
+    if drop_member:
+        if "member" in combined.coords:
+            combined=combined.isel(member=0).drop_vars("member").transpose("time","lat","lon")
+    else:
+        # reattach enslag as a clean (member,) coordinate
+        combined = combined.assign_coords(enslag=("member", enslag_by_member.values)).transpose("time","member","lat","lon")
+    return combined
+
+
+
+
+def organize_by_validtime(data, trim=True, drop_member=False):
+    """
+    data: dataarray in time format
+    """
+    if trim:
+        #finding time steps that do not have all data
+        sel=np.isnan(data).all(["lat","lon"]).sum("member")==0
+        
+        data=data.sel(time=sel)
+    member=data["member"]
+    time=data["time"]
+        
+    #find initialization days
+    isinit=(data.time.diff("time")> np.timedelta64(1, "D")).reindex(time=data.time, fill_value=True)
+    
+    isend=~isinit & isinit.shift(time=-1, fill_value=True)
+    
+    init_indices = np.where(isinit)[0]
+    
+    valid_time = data.time.isel(time=init_indices.data)
+    
+    #indices of member's last days
+    end_indices = np.where(isend)[0]
+
+
+    #iterating through cycles/blocks
+    blocks=[]
+    for i in range(len(init_indices)):
+        init_idx=init_indices[i]
+        end_idx=end_indices[i]+1
+        block = data.isel(time=slice(init_idx, end_idx))
+        block = block.rename({"time": "lead_time"})
+        block = block.assign_coords(
+            lead_time=range(block.sizes["lead_time"])
+        )
+        block["lead_time"].attrs={"units":"day"}
+        
+        # Use init_year from enumeration
+        block = block.expand_dims(dim={"valid_time":[valid_time.data[i]]})
+    
+        blocks.append(block)
+        
+    combined=xr.concat(blocks, "valid_time").transpose("valid_time","lead_time","member","lat","lon")
+    if drop_member:
+        combined=combined.isel(member=0).drop_vars("member").transpose("valid_time","lead_time","lat","lon")
+
+    return combined
+
+
+
+
+
+def organize_by_leadtime(data,nominal_time=None,is_observed=False):
+    """
+    Reshape data into (nominal_time, member, lead_time, lat, lon),
+    supporting multiple initializations inside a single file.
+    
     Initialization times are inferred independently for each member
     from transitions in the spatial NaN mask.
     """
-
+    
     _log("\n" + "="*60)
     _log(" START: organize_by_leadtime ".center(60, "="))
     _log("="*60 + "\n")
-
+    
     data = data.sortby("time")
-
+    
+    #obs data will come without member dimension, so just for consistency of further processing this dimension is added. We will drop it later, though.
     if not "member" in data.dims:
         data=data.expand_dims(dim={"member":[0]})
         
     _log("finding initialization date for each member")
     #find initialization days
     isinit_time=(data.time.diff("time") > np.timedelta64(1, "D")).reindex(time=data.time, fill_value=True)
-
-    # Assign years to each cycle
-    init_dates = data.time[isinit_time].data
-
+    
+    
+    if nominal_time is None:
+        # Assign time to each cycle - that is the time of the earliest initialization
+        nominal_times = data.time[isinit_time].data
+    else:
+        nominal_time=pd.to_datetime(nominal_time)
+        
+        nominal_times = data.time[isinit_time].data
+        nominal_times = [pd.to_datetime(d).replace(month=nominal_time.month, day=nominal_time.day) for d in nominal_times]
+        
     #iterate through members
     members=[]
     for m in data.member.values:
         member_data = data.sel(member=m)
-
         #initialization days when valid data start after a stagger gap
         # this cannot be inferred from time, as it might be different for each member
         # valid timesteps when any gridcell is non-nan
@@ -539,95 +675,66 @@ def organize_by_leadtime(data, agg_window="1D", agg_method="sum", drop_members=F
         
         #this is first valid day after the gap
         isinit_gap = valid & ~valid.shift(time=1, fill_value=False)
-
+        
+        #this will be index of the last valid
+        isend_gap=valid & ~valid.shift(time=-1, fill_value=False)
+    
         # now for non-staggered hindcasts, there are no gaps, so we need to use time-based init
         if isinit_gap.sum()>1:
             isinit=isinit_gap
+            isend=isend_gap
         else:
             isinit=isinit_time
+            isend=~isinit_time & isinit_time.shift(time=-1, fill_value=True)
         
         #indices of member's initialization days
         init_indices = np.where(isinit)[0]
         
-        #finding the end of the last valid data of the last cycle
-        lastvalid=np.where(valid)[0][-1]
-
-        #iterating through blocks
+        #indices of member's last days
+        end_indices = np.where(isend)[0]
+            
+        #iterating through cycles/blocks
         blocks=[]
-        for i, init_idx in enumerate(init_indices):
-            end_idx = init_indices[i + 1] if i + 1 < len(init_indices) else lastvalid
+        for i in range(len(init_indices)):
+            init_idx=init_indices[i]
+            end_idx=end_indices[i]+1
             block = member_data.isel(time=slice(init_idx, end_idx))
-
             block = block.rename({"time": "lead_time"})
+            #block = block.assign_coords(
+            #    lead_time=pd.to_timedelta(range(block.sizes["lead_time"]), unit="D")
+            #)
             block = block.assign_coords(
-                lead_time=pd.to_timedelta(range(block.sizes["lead_time"]), unit="D")
+                lead_time=range(block.sizes["lead_time"])
             )
-        
+            block["lead_time"].attrs={"units":"day"}
+            
             # Use init_year from enumeration
-            block = block.expand_dims(init_date=[init_dates[i]], member=[m])
-
+            block = block.expand_dims(nominal_time=[nominal_times[i]], member=[m])
+    
             blocks.append(block)
-
-        members.append(xr.concat(blocks,dim="init_date",join="outer"))
+    
+        members.append(xr.concat(blocks,
+        		dim="nominal_time",
+        		join="outer",
+        		coords=["enslag"]
+        		)
+        	)
     _log("Concatenating member blocks...")
-
+    
     reshaped = xr.concat(
         members,
         dim="member",
-        join="outer"
+        join="outer",
+        coords=["enslag"]
     )
+    reshaped=reshaped.transpose("nominal_time","lead_time","member","lat","lon")
     
-
-    
-    # --- validate aggregation type ---
-    if agg_method not in ["mean", "sum"]:
-        raise ValueError(
-            "agg_method must be 'mean' or 'sum', got '{}'".format(agg_method)
-        )
-
-    agg_windows=["1D","3D","5D","7D","10D"]
-    # --- validate aggregation window ---
-    if agg_window not in agg_windows:
-        raise ValueError(
-            "agg_window must be one of {} got '{}'".format(" ".join(agg_windows),agg_window)
-        )
-        
-    _log(f"Aggregating lead_time to {agg_window} blocks ({agg_method})...")
-
-    #this is for removing last window if not full set of days
-    window_days = pd.Timedelta(agg_window).days
-
-    resampler = reshaped.resample(
-        lead_time=agg_window,
-        label="left",
-        closed="left"
-    )
-
-    #resampling with min_count. This will give nan to the last window if it does not have full number of days
-    if agg_method == "mean":
-        reshaped = resampler.mean(min_count=window_days)
-    else:
-        reshaped = resampler.sum(min_count=window_days)
-
-    #converting init_time timedelta to plain count
-    reshaped["lead_time"]=range(len(reshaped.lead_time))
-    
-    #removing nans
-    valid = ~np.isnan(reshaped).all(("member", "init_date", "lat", "lon"))
-    reshaped = reshaped.sel(lead_time=valid)
-    
-    #masking nans in space
-    mask= ~np.isnan(data).all(("time","member"))
-    reshaped = reshaped.where(mask)
-
-    #dropping members
-
-    if drop_members:
-        reshaped=reshaped.mean("member")
-    
-    _log("="*60 + "\n")
-
     return reshaped
+    
+
+
+
+
 
 def load_raw_data(nominal_date,
                         download_dir,
@@ -689,8 +796,6 @@ def load_raw_data(nominal_date,
     _log("logging is on")
 
     
-
-
     #feedback
     _log("nominal forecast date: {}".format(nominal_date), force=True)
     _log("download dir: {}".format(download_dir), force=True)
@@ -740,6 +845,8 @@ def load_raw_data(nominal_date,
     #returning arrays
     return hindcast,forecast,obs
     
+
+
 
 
 
@@ -953,6 +1060,10 @@ def postprocess_forecast(nominal_date,
     
     return hindcast_leadtime_window_aggregate,forecast_leadtime_window_aggregate,obs_leadtime_window_aggregate
 
+
+
+
+
     
 
 def get_example_data(data_dir):
@@ -1025,3 +1136,182 @@ def get_example_data(data_dir):
     return True
 
 
+
+
+
+
+# registry of available aggregation functions
+AGG_FUNCTIONS = {}
+
+def register_agg(name):
+    """Decorator to register an aggregation function under a name."""
+    def wrapper(func):
+        AGG_FUNCTIONS[name] = func
+        return func
+    return wrapper
+
+
+# --- built-ins ---
+
+@register_agg("mean")
+def _mean(da, dim, **kwargs):
+    return da.mean(dim=dim)
+
+@register_agg("sum")
+def _sum(da, dim, **kwargs):
+    return da.sum(dim=dim)
+
+@register_agg("count_zero")
+def _count_zero(da, dim, **kwargs):
+    return (da == 0).sum(dim=dim)
+
+@register_agg("count_above")
+def _count_above(da, dim, threshold=0, **kwargs):
+    return (da > threshold).sum(dim=dim)
+
+@register_agg("max")
+def _max(da, dim, **kwargs):
+    return da.max(dim=dim)
+    
+
+
+
+
+
+def aggregate(
+    data,
+    window_size,
+    method="mean",
+    dim="lead_time",
+    **kwargs):
+    """
+    Resample `data` over `dim` into `agg_window`-sized bins, applying
+    the named aggregation function, and masking incomplete trailing windows.
+    
+    Parameters
+    ----------
+    data : xr.DataArray or xr.Dataset
+    window_size : int, e.g. 5
+    method : str, name of a function registered in AGG_FUNCTIONS
+    dim : str, dimension being resampled (default "lead_time")
+    **kwargs : passed through to the aggregation function
+    """
+    
+    _log(f"Aggregating lead_time to {window_size}-D blocks using ({method})...")
+
+    #arbitrary choice
+    agg_windows=list(range(5,11))
+
+    #checking if method is available
+    if method not in AGG_FUNCTIONS:
+        raise ValueError(
+            f"Unknown aggregation method '{method}'. "
+            f"Available: {list(AGG_FUNCTIONS)}"
+        )
+        
+    #picking up requested method
+    func = AGG_FUNCTIONS[method]
+    
+    # validating aggregation window
+    if window_size not in agg_windows:
+        raise ValueError(
+            "agg_window must be one of {} got '{}'".format(" ".join(agg_windows),agg_window)
+        )
+    
+    #agg_window is just window in the xarray format
+    agg_window=f"{window_size}D"
+
+    # this converts integer index to timedelta - and this is necessary for the aggregator function
+    data = data.assign_coords({dim: pd.to_timedelta(data[dim], "D")})
+
+    # truncate to a multiple of window_days before resampling
+    n_total = data.sizes[dim]
+    n_full = (n_total // window_size) * window_size
+    
+    if n_full < n_total:
+        dropped = n_total - n_full
+        print(
+                f"resample_agg: dropping last {dropped} step(s) of '{dim}' "
+                f"({n_total} not divisible by window_size={window_size}); "
+                f"keeping {n_full} steps."
+        )
+        data = data.isel({dim: slice(0, n_full)})
+    
+    resampler = data.resample(
+        **{dim: agg_window},
+        label="left",
+        closed="left"
+    )
+    
+    #aggregating done here!
+    aggdata = resampler.map(lambda da: func(da, dim=dim, **kwargs))
+    
+    
+    #finding nans
+    coords=["lead_time"]
+
+    for v in ["member","nominal_time","valid_time","init_time"]:
+        if v in data.coords:
+            coords.append(v)
+            
+    spatial_nan_mask = np.isnan(data).all(coords)
+    
+    #removing all nans
+    aggdata = aggdata.where(~spatial_nan_mask)    
+    
+    #bringing the lead_time to days from timedelta
+    aggdata[dim]=(aggdata[dim]/np.timedelta64(1, 'D')).astype(int)
+    
+    return aggdata
+
+
+#this is temporary function
+def add_enslag(data, nominal_date):
+    isinit_time=(data.time.diff("time") > np.timedelta64(1, "D")).reindex(time=data.time, fill_value=True)
+    
+    if nominal_date is None:
+        # Assign time to each cycle - that is the time of the earliest initialization
+        nominal_dates = data.time[isinit_time].data
+    else:
+        nominal_date=pd.to_datetime(nominal_date)
+        
+        nominal_dates = data.time[isinit_time].data
+        nominal_dates = [pd.to_datetime(d).replace(month=nominal_date.month, day=nominal_date.day) for d in nominal_dates]
+        
+    #iterate through members
+    enslags=[]
+    ensdates=[]
+    for m in data.member.values:
+        member_data = data.sel(member=m)
+        #initialization days when valid data start after a stagger gap
+        # this cannot be inferred from time, as it might be different for each member
+        # valid timesteps when any gridcell is non-nan
+        valid = ~np.isnan(member_data).all(("lat", "lon"))
+        
+        #this is first valid day after the gap
+        isinit_gap = valid & ~valid.shift(time=1, fill_value=False)
+        
+        #this will be index of the last valid
+        isend_gap=valid & ~valid.shift(time=-1, fill_value=False)
+    
+        # now for non-staggered hindcasts, there are no gaps, so we need to use time-based init
+        if isinit_gap.sum()>1:
+            isinit=isinit_gap
+            isend=isend_gap
+        else:
+            isinit=isinit_time
+            isend=~isinit_time & isinit_time.shift(time=-1, fill_value=True)
+        
+        #indices of member's initialization days
+        init_indices = np.where(isinit)[0]
+        
+        #indices of member's last days
+        end_indices = np.where(isend)[0]
+        
+        enslag=int((data.time.data[init_indices[0]]-nominal_dates[0])/np.timedelta64(1, 'D'))
+    
+        enslags.append(enslag)
+        ensdates.append(data.time.data[init_indices[0]])
+    
+    data=data.assign_coords(enslag=("member",enslags))
+    return data
