@@ -255,7 +255,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         else:
             shift_day_value = 0 
         # only shift the time, if you want a 'forecast-based' time.
-        rf_shifttime(f'{filename}_allens_{lag}',f'{filename}_timeshifted_allens_{lag}',lag,shift_days=shift_day_value)
+        rf_shifttime(f'{filename}_allens_{lag}',f'{filename}_timeshifted_allens_{lag}',shift_days=shift_day_value)
 
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # same process following even with one forecast initialisation date to ensure same structure for all output. 
@@ -322,19 +322,18 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         cleanup_patterns(f"{filename}_control*",f"{filename}_perturbed*",f"{filename}_allens*",f'{filename}_timeshifted*')
 		
 # Explicitly decode forecast lead times as timedeltas by default to avoid the xarray FutureWarning.
-def rf_shifttime(fn, output_fn, lag, shift_days=0, decode_timedelta=True):
+def rf_shifttime(fn, output_fn, shift_days=0, decode_timedelta=True):
     '''
     Shift time so it is aligned with fc_init_date. Additionally, keep forecast date information
     '''
     orig_hc = xr.open_dataset(fn, engine='cfgrib', decode_timedelta=decode_timedelta) # take the original rfc
     lag_shift = np.timedelta64(shift_days, 'D') # compute a shift lag given requested shift days
-
     orig_hc_new = orig_hc.rename({'time': 'hc_init_date'}) # change name of time to hc_init_date
-
-    orig_hc_new = orig_hc_new.assign_coords(step=orig_hc_new.step + lag_shift) # have step shifted by lag_shift, i.e. if leadtime = 5 days, but reforecast is a day ahead, shift step back by a day, i.e. 4 days.
-
-    orig_hc_new = orig_hc_new.assign_coords(valid_time=(('hc_init_date', 'step'),orig_hc_new.hc_init_date.values[:, None] + orig_hc_new.step.values[None, :])) # assign a valid time coordinate thats based on new step and the hc_init_date.
-
+    orig_hc_new = orig_hc_new.assign_coords(
+    relative_step=(('hc_init_date', 'step'),
+        np.broadcast_to(orig_hc_new.step.values + lag_shift,
+            (orig_hc_new.sizes['hc_init_date'],orig_hc_new.sizes['step'])))) # have step shifted by lag_shift, i.e. if leadtime = 5 days, but reforecast is a day ahead, shift step back by a day, i.e. 4 days.
+    orig_hc_new = orig_hc_new.assign_coords(valid_time=(('hc_init_date', 'step'),orig_hc_new.hc_init_date.values[:, None] + orig_hc_new.relative_step.values)) # assign a valid time coordinate thats based on new step and the hc_init_date.
     orig_hc_new.to_netcdf(output_fn) # save as netcdf
 
 def set_cf_to_pf(input_file, output_file):
