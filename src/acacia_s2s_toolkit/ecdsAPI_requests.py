@@ -27,56 +27,6 @@ def cleanup_patterns(*patterns):
             if path.is_file():
                 path.unlink()
 
-def accumulate_single_fc(fc, start_lt):
-    dim = 'step' if 'step' in fc.dims else 'time'
-    start_coords = fc[dim].isel({dim: slice(0, -1)})
-    fc = fc.diff(dim=dim)
-    fc = fc.assign_coords({dim: start_coords})
-    # First interval is only needed to establish the accumulation
-    # at start_lt, so remove it from the output.
-    if start_lt > 0:
-        fc = fc.isel({dim: slice(1, None)})
-    return fc
-
-
-def average_single_fc(fc, period):
-    dim = 'step' if 'step' in fc.dims else 'time'
-    # e.g. '7D' -> 7
-    n_days = int(period[:-1])
-    # trim to complete periods
-    n_complete = (fc.sizes[dim] // n_days) * n_days
-    # Save start coordinate before aggregation
-    start_coords = fc[dim].isel({dim: slice(0, n_complete, n_days)})
-
-    fc = (fc.isel({dim: slice(0, n_complete)}).coarsen({dim: n_days}, boundary='trim').mean())
-    # Force coordinate to start of averaging period
-    fc = fc.assign_coords({dim: start_coords})
-    return fc
-
-def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
-    # addition to deaccumulate accumulation field or average instantaneous or daily fields.
-    # if accumulation field, take a difference
-    # Convention:
-    # time coordinate always represents the START of the period
-    # represented by each value.
-    time_resolution = argument_output.get_timeresolution(variable)
-    if not hindcast:
-        if 'accumulated' in time_resolution:
-            forecast = accumulate_single_fc(forecast,start_lt)
-        else:
-            forecast = average_single_fc(forecast,period)
-    else:
-        processed_hindcasts = []
-        for hc_init, hc_run in forecast.groupby('hc_init_date'):
-            if 'accumulated' in time_resolution:
-                hc_run_processed = accumulate_single_fc(hc_run,start_lt)
-            else:
-                hc_run_processed = average_single_fc(hc_run,period)
-            processed_hindcasts.append(hc_run_processed)
-        forecast = xr.concat(processed_hindcasts,dim='hc_init_date').sortby('hc_init_date')
-
-    return forecast
-
 def create_initial_ecdsAPI_request(fcdate,grid,area,origin,webapi_param,leadtimes):
     request_dict = {
             "class": "s2",
@@ -438,3 +388,55 @@ def add_zero_time(input_file, output_file):
                     break
                 ec.codes_write(gid, fout)
                 ec.codes_release(gid)
+
+
+def accumulate_single_fc(fc, start_lt):
+    dim = 'step' if 'step' in fc.dims else 'time'
+    start_coords = fc[dim].isel({dim: slice(0, -1)})
+    fc = fc.diff(dim=dim)
+    fc = fc.assign_coords({dim: start_coords})
+    # First interval is only needed to establish the accumulation
+    # at start_lt, so remove it from the output.
+    if start_lt > 0:
+        fc = fc.isel({dim: slice(1, None)})
+    return fc
+
+
+def average_single_fc(fc, period):
+    dim = 'step' if 'step' in fc.dims else 'time'
+    # e.g. '7D' -> 7
+    n_days = int(period[:-1])
+    # trim to complete periods
+    n_complete = (fc.sizes[dim] // n_days) * n_days
+    # Save start coordinate before aggregation
+    start_coords = fc[dim].isel({dim: slice(0, n_complete, n_days)})
+
+    fc = (fc.isel({dim: slice(0, n_complete)}).coarsen({dim: n_days}, boundary='trim').mean())
+    # Force coordinate to start of averaging period
+    fc = fc.assign_coords({dim: start_coords})
+    return fc
+
+def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
+    # addition to deaccumulate accumulation field or average instantaneous or daily fields.
+    # if accumulation field, take a difference
+    # Convention:
+    # time coordinate always represents the START of the period
+    # represented by each value.
+    time_resolution = argument_output.get_timeresolution(variable)
+    if not hindcast:
+        if 'accumulated' in time_resolution:
+            forecast = accumulate_single_fc(forecast,start_lt)
+        else:
+            forecast = average_single_fc(forecast,period)
+    else:
+        processed_hindcasts = []
+        for hc_init, hc_run in forecast.groupby('hc_init_date'):
+            if 'accumulated' in time_resolution:
+                hc_run_processed = accumulate_single_fc(hc_run,start_lt)
+            else:
+                hc_run_processed = average_single_fc(hc_run,period)
+            processed_hindcasts.append(hc_run_processed)
+        forecast = xr.concat(processed_hindcasts,dim='hc_init_date').sortby('hc_init_date')
+
+    return forecast
+
