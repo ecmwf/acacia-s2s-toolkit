@@ -452,7 +452,30 @@ def output_formatted_leadtimes(leadtime_hour, fcdate, variable, origin_id,period
     fc_enslags_arr = np.atleast_1d(fc_enslags) if np.size(fc_enslags) else np.array([0])
 
     # ---------- SHIFTED FORECAST DATE ----------
-    new_fcdate = datetime.strptime(fcdate, '%Y%m%d') + timedelta(days=float(lag))
+    # Accept forecast dates as YYYYMMDD or YYYY-MM-DD,
+    # as well as datetime/date-like objects.
+    if hasattr(fcdate, "strftime") and not isinstance(fcdate, str):
+        fcdate_obj = fcdate
+    else:
+        fcdate_str = str(fcdate).strip()
+
+        for date_format in ("%Y%m%d", "%Y-%m-%d"):
+            try:
+                fcdate_obj = datetime.strptime(fcdate_str, date_format)
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(
+                f"Invalid fcdate {fcdate!r}. "
+                "Expected 'YYYYMMDD' or 'YYYY-MM-DD'."
+            )
+
+    # Normalise internally to YYYYMMDD because downstream toolkit
+    # functions expect this format.
+    fcdate = fcdate_obj.strftime('%Y%m%d')
+
+    new_fcdate = fcdate_obj + timedelta(days=float(lag))
     convert_fcdate = new_fcdate.strftime('%Y-%m-%d')
 
     # ---------- TIME RESOLUTION ----------
