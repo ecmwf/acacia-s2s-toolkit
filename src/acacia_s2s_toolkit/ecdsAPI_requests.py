@@ -95,7 +95,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin == 'rjtd' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
+        if origin == 'rjtd' or origin == 'rksl' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
             print ('need to add zero time')
             add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
             add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
@@ -239,7 +239,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin == 'rjtd' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
+        if origin == 'rjtd' or origin == 'rksl' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
             print ('need to add zero time')
             add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
             add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
@@ -344,7 +344,7 @@ def set_cf_to_pf(input_file, output_file):
 
 def add_zero_time(input_file, output_file):
     '''
-    Needed as JMA as no timestep=0 information (only used for accumulations) 
+    Needed as JMA and KMA as no timestep=0 information (only used for accumulations) 
     '''
     first_messages = []
     with open(input_file, 'rb') as fin:
