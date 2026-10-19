@@ -32,7 +32,24 @@ Contents
    Installation
    download_forecasts
    download_reforecast
-   models
+   bias_correction
+   skill_evaluation
+   
+.. toctree::
+   :maxdepth: 1
+   :caption: Understanding User Inputs
+
+   models 
+   leadtime_hour
+   fc_enslags
+   rf_enslags
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Understanding Toolkit Outputs
+
+   output
+   grid
 
 .. toctree::
    :maxdepth: 1
@@ -47,6 +64,14 @@ Contents
    :maxdepth: 1
    :caption: Theory
 
-   subseasonal_forecasting
+   theory_subseasonal_forecasting
+   theory_reforecasts
+   theory_lagged_ensembles
+   theory_bias_correction
    tips_faq
+   
+
+   
+   
+   
    
