@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import datetime
 import os,sys,glob
-import xesmf as xe
+#import xesmf as xe
 import pooch
 
 

@@ -7,15 +7,18 @@ import numpy as np
 import pandas as pd
 import datetime
 import os,sys,glob
-import xesmf as xe
 import pooch
+
+from functools import partial
+
+from xsdba_corrector import BiasCorrector, XsdbaCorrector
 
 
 #this is for readthedocs to work correctly. These packages cannot be installed by pip, so one has to mock import them
 autodoc_mock_imports = []
 
 #this determines with functions will be publicly visible in the installed package
-__all__=["biascorrection"]
+__all__=["bias_correct"]
 
 
 #######################################################################################
@@ -39,355 +42,329 @@ def _log(msg, force=False):
         print(msg)
         
 
-from scipy.stats import gaussian_kde
-
-#helper function for kde distribution fitting
-def _kde_cdf_grid(sample, n_grid=2000, pad_factor=3):
-    """Return (grid, cdf) for a smoothed CDF via KDE."""
-    kde = gaussian_kde(sample)  # Scott's rule bandwidth by default
-    std = sample.std()
-    lo = sample.min() - pad_factor * std
-    hi = sample.max() + pad_factor * std
-    grid = np.linspace(lo, hi, n_grid)
-    pdf_vals = kde(grid)
-    cdf_vals = np.cumsum(pdf_vals)
-    cdf_vals /= cdf_vals[-1]
-    return grid, cdf_vals
 
 
-# registry of available aggregation functions
-BC_FUNCTIONS = {}
-
-def register_bc(name):
-    """Decorator to register an aggregation function under a name."""
-    def wrapper(func):
-        BC_FUNCTIONS[name] = func
-        return func
-    return wrapper
+# ---------
 
 
-
-
-@register_bc("scaling")
-def simple_scaling(hc_1d, ob_1d, x_1d):
-
-    #simple correction of mean and variance
-    
-    #calculating variance, or actually standard deviation
-    hcsd=hc_1d.std(ddof=0)
-    
-    #calculating variance adjustment
-    std_correction=ob_1d.std(ddof=0)/hcsd
-    
-    #adjusting target
-    fcadj=((x_1d-hc_1d.mean())*std_correction)+x_1d.mean()
-    
-    return fcadj
-
-@register_bc("qm-kde")
-def qm_core_kde(hc_1d, ob_1d, x_1d, n_grid=2000):
-    hc_1d = hc_1d[~np.isnan(hc_1d)]
-    ob_1d = ob_1d[~np.isnan(ob_1d)]
-
-    if len(hc_1d) < 2 or len(ob_1d) < 2:
-        return np.full_like(x_1d, np.nan)
-
-    hc_grid, hc_cdf = _kde_cdf_grid(hc_1d, n_grid=n_grid)
-    ob_grid, ob_cdf = _kde_cdf_grid(ob_1d, n_grid=n_grid)
-
-    # x -> quantile via smoothed hindcast CDF
-    p = np.interp(x_1d, hc_grid, hc_cdf, left=hc_cdf[0], right=hc_cdf[-1])
-
-    # quantile -> obs value via smoothed obs CDF inverse
-    result = np.interp(p, ob_cdf, ob_grid)
-    #print(result)
-    	
-    return result
-    
-    
-@register_bc("qm-ecdf")
-def qm_core_ecdf(hc_1d, ob_1d, x_1d):
-
-    # remove NaNs
-    hc_1d = hc_1d[~np.isnan(hc_1d)]
-    ob_1d = ob_1d[~np.isnan(ob_1d)]
-    
-    if len(hc_1d) == 0 or len(ob_1d) == 0:
-        return np.full_like(x_1d, np.nan)
-
-    hc_sorted = np.sort(hc_1d)
-    ob_sorted = np.sort(ob_1d)
-    
-    q_hc = np.linspace(0, 1, len(hc_sorted))
-    q_ob = np.linspace(0, 1, len(ob_sorted))
-    
-    p = np.interp(x_1d, hc_sorted, q_hc)
-    
-    return np.interp(p, q_ob, ob_sorted)
-
-from scipy.stats import gamma
-
-
-@register_bc("qm-gamma")
-def qm_core_gamma(hc_1d, ob_1d, x_1d):
-    hc_1d = hc_1d[~np.isnan(hc_1d)]
-    ob_1d = ob_1d[~np.isnan(ob_1d)]
-
-    if len(hc_1d) < 2 or len(ob_1d) < 2:
-        return np.full_like(x_1d, np.nan)
-
-    p0_hc = (hc_1d <= 0).mean()
-    p0_ob = (ob_1d <= 0).mean()
-
-    hc_pos = hc_1d[hc_1d > 0]
-    ob_pos = ob_1d[ob_1d > 0]
-
-    if len(hc_pos) < 2 or len(ob_pos) < 2:
-        return np.full_like(x_1d, np.nan)
-
-    hc_shape, hc_loc, hc_scale = gamma.fit(hc_pos, floc=0)
-    ob_shape, ob_loc, ob_scale = gamma.fit(ob_pos, floc=0)
-
-    result = np.zeros_like(x_1d, dtype=float)
-
-    # step 1: get each x's quantile under HC's *mixed* CDF
-    p_hc = np.where(
-        x_1d <= 0,
-        0.0,  # anything <=0 sits at/below HC's own zero mass
-        p0_hc + (1 - p0_hc) * gamma.cdf(x_1d, hc_shape, loc=hc_loc, scale=hc_scale)
-    )
-
-    # step 2: values whose HC-quantile falls within obs's zero-mass -> 0
-    is_zero = p_hc <= p0_ob
-    result[is_zero] = 0.0
-
-    # step 3: remaining values -> rescale into obs's positive-part quantile space
-    pos_mask = ~is_zero
-    if pos_mask.any():
-        p_rescaled = (p_hc[pos_mask] - p0_ob) / (1 - p0_ob)
-        p_rescaled = np.clip(p_rescaled, 0, 1)  # guard against float edge cases
-        result[pos_mask] = gamma.ppf(p_rescaled, ob_shape, loc=ob_loc, scale=ob_scale)
-
-    return result
-
-
-    
-def biascorrection(forecast,hindcast, observed, window_size=7, is_aggregated=False, method="qm-ecdf"):
+# --------------------------------------------------------------------------- bespoke method
+class MeanVarCorrector(BiasCorrector):
     """
-    Apply quantile-quantile mapping bias correction to forecast and hindcast data.
+    Correction of mean and spread, per lead time and grid point.
+ 
+    kind="+" (default; temperature and other unbounded variables) - mean/variance scaling:
+        corrected = (sim - mean_hist) / std_hist * std_ref + mean_ref
+    kind="*" (precipitation and other non-negative variables) - power transformation
+    (Leander & Buishand 2007, J. Hydrol. 332):
+        corrected = a * sim**b
+        b is chosen so that the coefficient of variation (std/mean) of hist**b equals that of
+        ref, then a so that the means match. Output is never negative and zeros stay zero.
+        b is searched in [b_min, b_max]; where the target is outside that range, b is clipped
+        and the spread is only partly corrected. Negative input values are set to 0.
+ 
+    Statistics always pool all years (and, for the hindcast, all members). Pooling across
+    lead times, as in XsdbaCorrector:
+        "lead"    : statistics per lead time
+        "rolling" : per lead time, from a centred window of `window_size` leads
+                    (truncated at the first and last leads)
+        "blocks"  : one set of statistics per block of `window_size` leads, used for every
+                    lead in the block; a short last block is merged into the previous one
+    """
+ 
+    POOLINGS = ("lead", "rolling", "blocks")
+ 
+    def __init__(self, lead_dim="effective_lead_time", member_dim="member",
+                 pooling="lead", window_size=7, kind="+", b_min=0.1, b_max=4.0):
+        if pooling not in self.POOLINGS:
+            raise ValueError(f"pooling must be one of {self.POOLINGS}")
+        if kind not in ("+", "*"):
+            raise ValueError("kind must be '+' or '*'")
+        self.lead_dim, self.member_dim = lead_dim, member_dim
+        self.pooling, self.window_size, self.kind = pooling, int(window_size), kind
+        self.b_grid = np.linspace(b_min, b_max, int(round((b_max - b_min) / 0.05)) + 1)
+ 
+    def _stats(self, da, dims, power=None):
+        """Mean and std of da (or da**power) over `dims`, pooled across leads per `pooling`.
+        `power` may be a scalar or an array along (lead, ...); in a rolling window each
+        window uses the power of its central lead."""
+        L = self.lead_dim
+        if self.pooling == "lead":
+            x = da if power is None else da ** power
+            return x.mean(dims), x.std(dims)
+        if self.pooling == "rolling":
+            w = da.rolling({L: self.window_size}, center=True).construct("_win")
+            w = w if power is None else w ** power
+            return w.mean(dims + ["_win"]), w.std(dims + ["_win"])
+        # blocks: statistics per block, then mapped back onto every lead of the block
+        # (power is constant within a block, because the statistics it is fitted to are)
+        x = da if power is None else da ** power
+        blocks = make_lead_blocks(da.sizes[L], self.window_size)
+        block_of_lead = np.concatenate([np.full(len(b), i) for i, b in enumerate(blocks)])
+        idx = xr.DataArray(block_of_lead, dims=L)
+        g = x.assign_coords(_block=(L, block_of_lead)).groupby("_block")
+        mean = g.mean(dims + [L]).isel(_block=idx).drop_vars("_block")
+        std = g.std(dims + [L]).isel(_block=idx).drop_vars("_block")
+        return mean.assign_coords({L: da[L]}), std.assign_coords({L: da[L]})
+ 
+    def _fit_power(self, ref, hist, hdims):
+        """Exponent b with CV(hist**b) = CV(ref), by linear interpolation on b_grid."""
+        r_mean, r_std = self._stats(ref, [self.init_dim])
+        target = r_std / r_mean
+        cv = xr.concat([(lambda m, s: s / m)(*self._stats(hist, hdims, power=b))
+                        for b in self.b_grid], dim="_b")          # increases with b
+        target = target.broadcast_like(cv.isel(_b=0))
+        cvv = cv.transpose("_b", *target.dims).values
+        tv = target.values
+        above = cvv >= tv[None]
+        k = np.clip(np.argmax(above, axis=0), 1, len(self.b_grid) - 1)  # first b with cv >= target
+        k = np.where(above.any(axis=0), k, len(self.b_grid) - 1)
+        lo = np.take_along_axis(cvv, (k - 1)[None], 0)[0]
+        hi = np.take_along_axis(cvv, k[None], 0)[0]
+        frac = np.clip(np.where(hi > lo, (tv - lo) / (hi - lo), 1.0), 0, 1)
+        b = self.b_grid[k - 1] + frac * (self.b_grid[k] - self.b_grid[k - 1])
+        b = np.where(np.isfinite(tv) & np.isfinite(cvv).all(axis=0), b, np.nan)
+        b = xr.DataArray(b, dims=target.dims, coords=target.coords)
+        h_mean_b, _ = self._stats(hist, hdims, power=b)
+        a = (r_mean / h_mean_b).where(h_mean_b > 0, 0.0)
+        return a, b
+ 
+    def fit(self, ref, hist):
+        self._lead = hist[self.lead_dim].values
+        hdims = [self.init_dim, self.member_dim]
+        if self.kind == "*":
+            hist, ref = hist.clip(min=0), ref.clip(min=0)
+            self.a, self.b = self._fit_power(ref, hist, hdims)
+        else:
+            self.h_mean, self.h_std = self._stats(hist, hdims)
+            self.r_mean, self.r_std = self._stats(ref, [self.init_dim])
+        return self
+ 
+    def apply(self, sim):
+        # arithmetic aligns on lead labels; mismatched leads would silently disappear
+        if not np.array_equal(sim[self.lead_dim].values, self._lead):
+            raise ValueError(f"'{self.lead_dim}' of sim differs from the training data")
+        if self.kind == "*":
+            out = self.a * sim.clip(min=0) ** self.b
+        else:
+            out = (sim - self.h_mean) / self.h_std * self.r_std + self.r_mean
+        return out.transpose(*sim.dims).assign_attrs(sim.attrs)
+ 
+
+
+
+# --------------------------------------------------------------------------- registry
+REGISTRY: dict[str, object] = {}
+ 
+ 
+def register(name, corrector):
+    """Make a corrector available to bias_correct under `name`.
+    corrector : class (or callable) returning a BiasCorrector; called with
+                lead_dim=..., member_dim=... and the user's options."""
+    REGISTRY[name] = corrector
+ 
+ 
+for _m in ("eqm", "scaling", "dqm"):
+    register(_m, partial(XsdbaCorrector, _m))
+register("meanvar", MeanVarCorrector)
+ 
+
+
+def _match_leads(fcst, hcst, lead_dim):
+    """Restrict the forecast to the hindcast's lead times. Staggered inits can leave the
+    forecast with extra leads; leads the hindcast has but the forecast lacks are an error."""
+    f, h = fcst[lead_dim].values, hcst[lead_dim].values
+    missing = h[~np.isin(h, f)]
+    if missing.size:
+        raise ValueError(f"forecast lacks hindcast lead times {missing}")
+    extra = f[~np.isin(f, h)]
+    if extra.size:
+        _log(f"bias_correct: dropping {extra.size} forecast lead times not in the hindcast: {extra}")
+        fcst = fcst.sel({lead_dim: h})
+    return fcst
     
-    For each lead time, maps the emiprical distribution of the hindcast and forecast
-    to match the observed empirical distribution using quantile mapping. The transfer
-    function is derived from the hindcast/observation pair and applied to
-    both hindcast and forecast. This is simple quantile mapping based on emiprical 	
-    distributions and without extension of tails, and thus by nature bias-corrected forecast 
-    maxima/minima will not exceed these in observations.   
+def _to_points(da: xr.DataArray, mask: xr.DataArray, *, lat: str = "latitude", lon: str = "longitude") -> xr.DataArray:
+    """
+    Replace (lat, lon) with a single 'point' dimension holding only cells where `mask` is True
+    (e.g. land). lat/lon are kept as plain coordinates along 'point' (no MultiIndex, which
+    xsdba cannot handle). Skipping masked cells avoids all-NaN warnings and wasted work.
+    """
+    st = da.stack(point=(lat, lon))
+    keep = mask.stack(point=(lat, lon)).values.astype(bool)
+    lats, lons = st[lat].values[keep], st[lon].values[keep]
+    out = st.drop_vars(["point", lat, lon]).isel(point=np.flatnonzero(keep))
+    return out.assign_coords({lat: ("point", lats), lon: ("point", lons)})
+
+     
+def _from_points(da: xr.DataArray, grid: xr.DataArray, *, lat: str = "latitude", lon: str = "longitude") -> xr.DataArray:
+    """
+    Inverse of to_points: put 'point' data back onto the full lat/lon grid, NaN in masked cells.
+ 
+    grid : any array with `lat` and `lon` as dimensions that defines the full grid, e.g. the
+           land mask or the original gridded data (not the output of to_points).
+    The other dimensions keep their order; (lat, lon) take the place of 'point'.
+    """
+    if lat not in grid.dims or lon not in grid.dims:
+        raise ValueError(f"`grid` must have '{lat}' and '{lon}' as dimensions "
+                         "(pass the land mask or the original gridded array)")
+    order = []
+    for d in da.dims:
+        order.extend([lat, lon] if d == "point" else [d])
+    out = da.set_index(point=[lat, lon]).unstack("point")
+    out = out.reindex({lat: grid[lat].values, lon: grid[lon].values})
+    return out.transpose(*order).assign_coords({lat: grid[lat], lon: grid[lon]})
+ 
+
     
+# --------------------------------------------------------------------------- format conversion
+def _to_bc(da, mask, units, init_dim, member_dim):
+    """Package format -> corrector format."""
+    # non-index coords and member labels go (member labels would make xsdba align the
+    # forecast against the hindcast's members); they are restored from the original later
+    out = da.reset_coords(drop=True).drop_vars(member_dim, errors="ignore")
+    out = out.rename({init_dim: "time"})
+    if units is None:
+        if "units" not in out.attrs:
+            raise ValueError("data have no 'units' attribute; pass units=...")
+    else:
+        out = out.assign_attrs(units=units)
+    if mask is None:
+        return out
+    lat, lon = mask.dims
+    return _to_points(out, mask, lat=lat, lon=lon)
+ 
+ 
+def _from_bc(da, like, mask, init_dim):
+    """Corrector format -> package format of `like` (the original array)."""
+    if mask is not None:
+        lat, lon = mask.dims
+        da = _from_points(da, grid=mask, lat=lat, lon=lon)
+    out = da
+    out = out.rename({"time": init_dim})
+    out = out.assign_coords({c: like[c] for c in like.coords if c not in out.coords})
+    out = out.transpose(*like.dims)
+    if out.sizes != like.sizes:
+        raise RuntimeError(f"size mismatch: {dict(out.sizes)} vs {dict(like.sizes)}")
+    return out
+ 
+
+
+
+import inspect
+import warnings
+
+def _accepted_options(factory, options):
+    """Split options into those the corrector accepts and those it doesn't."""
+    params = inspect.signature(factory).parameters
+    if any(p.kind is p.VAR_KEYWORD for p in params.values()):    # takes **kwargs: pass all
+        return options, {}
+    used = {k: v for k, v in options.items() if k in params}
+    unused = {k: v for k, v in options.items() if k not in params}
+    return used, unused
+    
+
+
+# --------------------------------------------------------------------------- entry point
+def bias_correct(obs, hcst, fcst=None, method="eqm", *, cv=True, pooling="lead", window_size=7, leave_out=1, mask="auto",
+                 units=None, return_model=False, init_dim="valid_time",
+                 lead_dim="effective_lead_time", member_dim="member", **options):
+    """
+    Bias-correct a hindcast and a forecast.
+ 
     Parameters
     ----------
-    forecast : xarray.DataArray
-        Forecast data with dimensions (lead_time, lat, lon, nominal_time, member).
-    hindcast : xarray.DataArray
-        Hindcast data with dimensions (lead_time, lat, lon, nominal_time, member).
-    observed : xarray.DataArray
-        Observed data with dimensions (lead_time, lat, lon, nominal_time).
-    leadtime_window : int
-        size of window over which data are grouped for bias correction
-    is_aggregated: boolean
-        whether data are already aggregated over windows. If True, leadtime_window of 1 is permitted.
-    
+    obs   : (valid_time, lead, lat, lon) observations aligned to hcst (see align_obs);
+            a member dimension of identical copies is allowed
+    hcst  : (valid_time, lead, member, lat, lon)
+    fcst  : (valid_time, lead, member, lat, lon), optional; any number of members, same leads
+    method : name in REGISTRY ("eqm", "scaling", "dqm", "meanvar", or your own)
+    cv : if True the returned hindcast is cross-validated (leave_out years at a time), as
+         needed for skill assessment; if False it is corrected in-sample. The forecast is
+         always corrected with the model fitted on all years.
+    mask : "auto" (cells where obs have any data), a boolean (lat, lon) array, or None.
+           Cells outside the mask are not corrected and are NaN in the output.
+    units : 'units' attribute if the data have none (required by xsdba methods).
+    return_model : also return the corrector fitted on all years.
+    **options : method options, e.g. pooling, window_size, nquantiles, kind, interp
+                (see XsdbaCorrector for the xsdba methods).
+ 
     Returns
     -------
-    forecast_bc : xarray.DataArray
-        Bias-corrected forecast, same shape as input forecast.
-    hindcast_bc : xarray.DataArray
-        Bias-corrected hindcast, same shape as input hindcast.
-    obs_bc : xarray.DataArray
-        Observations in the same structure as bias-corrected hindcast.
-    
-    Notes
-    -----
-    Member and nominal_time dimensions are stacked into a single sample dimension
-    before applying the quantile mapping, to maximise the sample size used
-    for estimating the transfer function.
-    
-    The core quantile mapping is performed by a function applied pointwise
-    over lat/lon using `xr.apply_ufunc` with dask parallelization support.
-    
-    
+    hcst_bc, fcst_bc            (fcst_bc is None if fcst is None)
+    hcst_bc, fcst_bc, model     if return_model
     """
+    if method not in REGISTRY:
+        raise ValueError(f"unknown method '{method}'; available: {list(REGISTRY)}")
+ 
+    if member_dim in obs.dims:                                  # broadcast copies -> drop
+        obs = obs.isel({member_dim: 0}, drop=True)
+    if isinstance(mask, str) and mask == "auto":
+        mask = obs.notnull().any([init_dim, lead_dim])
+ 
+    ref = _to_bc(obs, mask, units, init_dim, member_dim)
+    hist = _to_bc(hcst, mask, units, init_dim, member_dim)
     
-    #minimum size of grouping window
-    min_window_size=5
+    factory = REGISTRY[method]
+    used, unused = _accepted_options(factory, options)
+    if unused:
+        warnings.warn(f"method '{method}' ignores options {sorted(unused)}")
+    model = factory(lead_dim=lead_dim, member_dim=member_dim, **used).fit(ref, hist)
+
     
-    
-    # initial checks
-    
-    
-    #checking if method is available
-    if method not in BC_FUNCTIONS:
-        raise ValueError(
-            f"Unknown bias correction method '{method}'. "
-            f"Available: {list(BC_FUNCTIONS)}"
-        )
-        
-    #picking up requested method
-    func = BC_FUNCTIONS[method]
-        
-    
-    if is_aggregated:
-        #if aggregated data
-        if window_size!=1:
-            raise ValueError(
-                f"Aggregated data provided, and window size for aggregated data should be 1, got ({window_size}). Stopping..."
-            )
+    if cv:
+        hist_bc = model.fit_apply_loo(ref, hist, leave_out)
     else:
-        #if non-aggregated data
-        if window_size<min_window_size:
-            raise ValueError(
-                f"Requested window size ({window_size}) is too small to process daily data. Minimum {min_window_size} required. Stopping..."
-            )
+        hist_bc=model.apply(hist)
+        
+    hcst_bc = _from_bc(hist_bc, hcst, mask, init_dim)
+ 
+    hcst_bc.attrs["S2STK_bc_method"]=method
+    hcst_bc.attrs["S2STK_bc_pooling"]=pooling
+    hcst_bc.attrs["S2STK_bc_window_size"]=window_size
+    hcst_bc.attrs["S2STK_cv"]=str(cv)
     
-    timevar=None
-    for var in ["nominal_time","valid_time","time","init_time"]:
-        if var in hindcast.coords:
-            timevar=var
-    if timevar is None:
-            raise ValueError(
-                f"Could not find time variable. should be one of time, init_time, valid_time, nominal_time. Stopping..."
-            )        
-    #copy of original arrays to store results into
-    hindcast_adjusted=hindcast.copy().transpose("lead_time", "lat", "lon", timevar, "member")
-    forecast_adjusted=forecast.copy().transpose("lead_time", "lat", "lon", timevar, "member")
-    observed_adjusted=observed.copy().transpose("lead_time", "lat", "lon", timevar, "member")
+    fcst_bc = None
     
-    #getting some parameters for processing
-    lead_time = (set(forecast_adjusted.lead_time.data) & set(hindcast_adjusted.lead_time.data))
-    lead_time=np.array(list(lead_time))
+    if fcst is not None:
+        print("fcst")
+        fcst = _match_leads(fcst, hcst, lead_dim)
+        sim = _to_bc(fcst, mask, units, init_dim, member_dim)
+        fcst_bc = _from_bc(model.apply(sim), fcst, mask, init_dim)
+        
+        fcst_bc.attrs["S2STK_bc_method"]=method
+        fcst_bc.attrs["S2STK_bc_pooling"]=pooling
+        fcst_bc.attrs["S2STK_bc_window_size"]=window_size
+        
     
-    #splitting into windows
-    window_idx = lead_time // window_size
-    
-    #number of windows
-    n_windows = window_idx.max().item() + 1
-    
-    #number of full windows, i.e. with window_size datapoints
-    n_full = (len(lead_time) // window_size) * window_size
-    
-    if n_full<len(lead_time):
-        _log(f"Requested window size: {window_size}, data has {len(lead_time)} lead times. the last two windows will be processed as one")
-        window_idx[window_idx == window_idx.max()] = np.partition(window_idx, -2)[-2]
+    if return_model:
+        return (hcst_bc, fcst_bc, model) 
+    else:
+        return (hcst_bc, fcst_bc)
 
-    
-    #trimming to full window
-    n_lt=len(window_idx)
-    
-    forecast_trimmed = forecast_adjusted.isel(lead_time=slice(0, n_lt))
-    hindcast_trimmed = hindcast_adjusted.isel(lead_time=slice(0, n_lt))
-    observed_trimmed = observed.isel(lead_time=slice(0, n_lt))
-    
-    #trimming to full windows
-    #window_idx=window_idx[0:n_full]
-    lead_time=lead_time[0:n_lt]
-    
-    n_windows=max(window_idx)
-    
-    #iterating through lead times
-    for w in np.unique(window_idx):
-        mask=window_idx==w
-        
-        hc=hindcast_trimmed.isel(lead_time=mask)
-        fc=forecast_trimmed.isel(lead_time=mask)
-        ob=observed_trimmed.isel(lead_time=mask)
-    
-        #OBSERVATIONS
-        #pooling across all init_dates
-        ob_sample = (
-            ob.stack(sample_ob=("member", timevar))
-        )
-                
-        # drop for apply_ufunc
-        ob_input = ob_sample.reset_index("sample_ob", drop=True)
-    
-        #HINDCAST     
-        #pooling across all init_dates
-        #this creates dimension sample_hc, but keeps member and nominal_time coordinates
-        hc_sample = (
-            hc.stack(sample_hc=("member", timevar))
-        )
-        
-        # save the index before dropping
-        hc_sample_index = hc_sample.indexes["sample_hc"]
-    
-        # drop unnecessary dimensions for apply_ufunc
-        hc_input = hc_sample.reset_index("sample_hc", drop=True)
-    
-    
-        # adjusting hindcast
-        hcadj0=xr.apply_ufunc(
-            func,
-            hc_input,
-            ob_input,
-            hc_input,
-            input_core_dims=[["sample_hc"], ["sample_ob"], ["sample_hc"]],
-            output_core_dims=[["sample_hc"]],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[hc.dtype],
-            join="override",   
-        )
-    
-        
-        # restore index and unstack
-        #we need to create coordinates object to accommodate multiindex (member, nominal_time)
-        sample_hc_coords = xr.Coordinates.from_pandas_multiindex(hc_sample_index, 'sample_hc')
-        hcadj = hcadj0.assign_coords(sample_hc_coords)
-        hcadj = hcadj.unstack("sample_hc")
-        hcadj = hcadj.transpose(*hc.dims)
-    
-        
-        #FORECAST
-        #pooling across all init_dates
-        fc_sample = (
-            fc.stack(sample_fc=("member", timevar))
-        )
-        
-        # save the index before dropping
-        fc_sample_index = fc_sample.sample_fc
-        
-        # drop for apply_ufunc
-        fc_input = fc_sample.reset_index("sample_fc", drop=True)
-        
-    
-        # adjusting forecast
-        fcadj=xr.apply_ufunc(
-            func,
-            hc_input,
-            ob_input,
-            fc_input,
-            input_core_dims=[["sample_hc"], ["sample_ob"], ["sample_fc"]],
-            output_core_dims=[["sample_fc"]],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[hc.dtype],
-            join="override", 
-        )
-    
-    
-        fcadj = fcadj.assign_coords(sample_fc=fc_sample_index)
-        fcadj = fcadj.unstack("sample_fc")
-        fcadj = fcadj.transpose(*fc.dims)
-        
-        
-        #injecting adjusted data back to the original array
-        hindcast_trimmed.loc[dict(lead_time=mask)]=hcadj.data
-        forecast_trimmed.loc[dict(lead_time=mask)]=fcadj.data
-    
-        #adjusting sequence of dimensions
-        forecast_bc=forecast_trimmed.transpose(*hindcast.dims)
-        hindcast_bc=hindcast_trimmed.transpose(*forecast.dims)
 
-        
-        return forecast_bc, hindcast_bc, observed_trimmed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
