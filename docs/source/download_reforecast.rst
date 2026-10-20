@@ -9,6 +9,10 @@ Download a collection of reforecasts
 
 To download a selection of reforecasts from ECMWF's S2S database, you will need to use the `download_hindcast` function from the `download_hindcast.py` python module. To begin with, it is recommended that you download ECMWF reforecast data first to get used to the system. 
 
+.. note::
+
+   In this toolkit, the words 'reforecast' and 'hindcast' can be used interchangeably.  The function names tend to use the convention 'hindcast', whilst the documentation uses the convention 'reforecast'.
+
 To import the necessary function, use the following line of python code:
 
 .. code-block:: python
@@ -56,14 +60,5 @@ Parameters including **model**, **fcdate**, **plevs**, **location_name**, **bbox
 
 You can check the status of your webAPI downloads on the following `page <https://apps.ecmwf.int/webmars/joblist/>`_. 
 
-Examples
---------
-To be developed.
 
-
-Explanations of certain options
--------------------------------
-
-rf_enslags (reforecast lagged ensemble capability)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
