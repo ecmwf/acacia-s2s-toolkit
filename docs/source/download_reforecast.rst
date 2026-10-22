@@ -1,4 +1,4 @@
-Downloading operational reforecasts
+Downloading Operational Reforecasts
 ===================================
 
 .. important::
@@ -24,7 +24,7 @@ After this, use the `download_hindcast` function to download operational reforec
 .. code-block:: python
 
    download_hindcast(variable, model='ECMWF', fcdate=None, # key forecast parameters
-                     leadtime_hour=None, start_lt=0, end_lt=None, period='1D', # variables that define leadtimes to download
+                     start_lt=0, end_lt=None, period='1D', # variables that define leadtimes to download
                      country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], # variables that enable you to define spatial grid
                      plevs=None, # optional variable when downloading pressure-level data
                      filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", # characteristics associated with saved file
@@ -39,11 +39,17 @@ This function retrieves operational reforecast (hindcast) data for a specified m
 
 .. note::
 
-   Each variable must be requested separately.
+   Each ``variable`` must be requested separately.
 
 :Optional parameters:
 
-Parameters including **model**, **fcdate**, **plevs**, **location_name**, **bbox_bounds**, **filename**, **data_save_dir**, **data_format**, **grid**, **leadtime_hour**, **overwrite** and **verbose** are described in detail on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. Additional parameters specific to reforecast downloads include:
+Parameters including **model**, **fcdate**, **start_lt**, **end_lt**, **period**, **country_name**, **region_name**, **bbox_bounds**, **plevs**, **filename**, **data_save_dir**, **data_format**, **grid**, **overwrite** and **verbose** are described in detail on the `download_forecasts <https://acacia-s2s-toolkit.readthedocs.io/en/latest/download_forecasts.html>`_ webpage. 
+
+.. note::
+
+   The reforecast should use the same ``model`` as the forecast.
+
+Additional parameters specific to reforecast downloads include:
 
 - **rf_years** (*list of int*, optional): List of years to download reforecasts for. For example, [2000, 2001, 2002] will retrieve all reforecasts initialised between 2000 and 2002. Please note, due to changes when transferring to ECMWF Climate Data Store, all rf_years will be downloaded between the minimum and maximum of requested rf_years. 
 

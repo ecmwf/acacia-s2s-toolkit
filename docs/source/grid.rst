@@ -8,8 +8,6 @@ All models in the ECMWF database run using different native resolutions; see `EC
 
 Within this 1.5 degree grid, the user can select a bounding box enclosing their area of interest using a range of parameters including ``country_name``, ``region_name``, and ``bbox_bounds``.  See page "Downloading Operational Forecasts" for more detail on possible user inputs.
 
-[TO ADD: EXAMPLES OF ETHIOPIA AND MADAGASCAR DOMAINS]
-
 The toolkit requires the bounding box to align with the global 1.5 degree grid. If it does not, the toolkit deals with this automatically by adjusting the requested co-ordinates outwards in each direction (N, S, E, W) until all four edges of the bounding box snap to the global 1.5 degree grid.  Note the adjustment is always made outwards, to ensure that the entire original area is included.
 
 .. note::
