@@ -1,4 +1,4 @@
-Downloading operational forecasts
+Downloading Operational Forecasts
 =================================
 
 .. important::
@@ -20,7 +20,7 @@ After this, use `download_forecast` to download operational forecasts:
 .. code-block:: python
 
    download_forecast(variable, model='ECMWF', fcdate=None, # key forecast parameters
-                     leadtime_hour=None, start_lt=0, end_lt=None, period='1D', # variables that define leadtimes to download
+                     start_lt=0, end_lt=None, period='1D', # variables that define leadtimes to download
                      country_name=None, region_name=None, bbox_bounds=[90, -180, -90, 180], # variables that enable you to define spatial grid
                      plevs=None, # optional variable when downloading pressure-level data
                      filename=None, data_save_dir=None, data_format="netcdf", grid="1.5/1.5", # characteristics associated with saved file
@@ -38,11 +38,11 @@ After this, use `download_forecast` to download operational forecasts:
 
 .. note::
 
-    A separate download request is required for each variable.
+   Each ``variable`` must be requested separately.
 
 :Optional parameters:
 
-- **model** (*str*): The forecasting model. A full summary of models including their forecast frequency and data access delay can be found on `ECMWF's Model page <https://confluence.ecmwf.int/display/S2S/Models>`_. Supported models (as of 6th November 2025) include:
+- **model** (*str*): The forecasting model. If not specified, defaults to ``'ECMWF'``. A full summary of models including their forecast frequency and data access delay can be found on `ECMWF's Model page <https://confluence.ecmwf.int/display/S2S/Models>`_.  Supported models (as of 6th November 2025) include:
 
   - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts (default)
   - ``'ECCC'``: Environment and Climate Change Canada
@@ -54,19 +54,15 @@ After this, use `download_forecast` to download operational forecasts:
 
 - **fcdate** (*str*, optional): Forecast initialisation date in ``YYYYMMDD`` format. If no date is given, then the latest avaliable forecast is downloaded.
 
-- **leadtime_hour** (*int or list of int*, optional): Forecast lead times in hours from initialisation. Example: 24 for 1 day, or [24, 48, 72] for 1 to 3 days. If None, then will refer to start_lt, end_lt and period. If a leadtime_hour is requested, periodic aggregation does not occur. 
-
 - **start_lt** (*int or str*, optional): First lead time (in hours) to include in the downloaded forecast. For example, ``24`` starts from day 1, while ``168`` starts from week 2. Alternatively, a day of the week (e.g. ``"monday"``, ``"tuesday"``) can be provided. In this case, the lead time is automatically calculated so that the forecast starts on the next occurrence of the requested day relative to ``fcdate``. If not specified, defaults to ``0``.
 
 - **end_lt** (*int*, optional): Final lead time (in hours) to include in the downloaded forecast. For example, ``672`` corresponds to day 28 of the forecast. If not requested, set to end of forecast. 
 
-- **period** (*str*, optional): Aggregation period used to select forecast lead times and compute aggregated products. The period should be specified in days, for example ``'1D'``, ``'2D'``, ``'7D'`` or ``'14D'``. Accumulated variables retain only the end of each aggregation period, while instantaneous and averaged variables are aggregated over the specified period. If not requested, and leadtime_hour is not requested, set to ``1D``.
+- **period** (*str*, optional): Aggregation period used to select forecast lead times and compute aggregated products. The period should be specified in days, for example ``'1D'``, ``'2D'``, ``'7D'`` or ``'14D'``. Accumulated variables retain only the end of each aggregation period, while instantaneous and averaged variables are aggregated over the specified period. If not requested, set to ``'1D'``.
 
 .. note::
 
-    If no leadtime information is provided, the download will focus on daily aggregation for the full forecast length.
-
-- **plevs** (*int or list of int*, optional): Pressure levels in hPa for pressure-level variables. Avaliable levels include 1000, 925, 850, 700, 500, 300, 200, 100, 50 and 10 hPa.  
+    If no leadtime information provided, the download will focus on **daily** aggregation for the **full forecast length** i.e. ``start_lt=0``, ``end_lt=None``, ``period='1D'``
 
 - **country_name** (*str*, optional): Country name used to derive bounds automatically from Natural Earth country polygons. Overrides ``bbox_bounds`` and ``region_name`` if provided. Current supported values include:
 
@@ -83,6 +79,8 @@ After this, use `download_forecast` to download operational forecasts:
 
 - **bbox_bounds** (*list of float*, optional, default ``[90, -180, -90, 180]``): Geographic bounding box in the order ``[north, west, south, east]`` (degrees latitude/longitude). Overridden if ``location_name`` is provided.
 
+- **plevs** (*int or list of int*, optional): Pressure levels in hPa for pressure-level variables. Avaliable levels include 1000, 925, 850, 700, 500, 300, 200, 100, 50 and 10 hPa.  
+
 - **filename** (*str*, optional): Name of the outputted file. If ``None``, filename is automatically constructed from variable, model, date, pressure levels, and domain. The function appends ``.nc`` or ``.grib`` depending on ``data_format``.
 
 - **data_save_dir** (*str*, optional): Directory to save the downloaded file. Created if it doesn’t exist. Defaults to the current working directory if ``None``.
@@ -90,8 +88,6 @@ After this, use `download_forecast` to download operational forecasts:
 - **data_format** (*str*, optional, default ``"netcdf"``): Output data format: ``"netcdf"`` or ``"grib"``. Current testing has focused on netCDF format.
 
 - **grid** (*str*, optional, default ``"1.5/1.5"``): Horizontal grid spacing (degrees) in ``lat/lon`` order.
-
-- **leadtime_hour** (*int or list of int*, optional): Forecast lead times in hours from initialisation. If ``None``, then all avaliable lead times for the requested forecast will be provided. Example: ``24`` for 1 day, or ``[24, 48, 72]`` for 1 to 3 days.
 
 - **fc_enslags** (*list of int*, optional): The selection of lagged ensemble members relative to the forecast initialisation date. Default values for each model are described in the `ECMWF variables page <https://confluence.ecmwf.int/display/~ecm0847/acacia_s2s_toolkit+available+forecasting+systems>`_.
 
