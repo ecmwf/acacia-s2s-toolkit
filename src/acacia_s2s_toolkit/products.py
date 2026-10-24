@@ -13,6 +13,7 @@ bias-corrected; the hindcast cross-validated):
     obs  : (valid_time, lead, lat, lon)            hindcast years
     hcst : (valid_time, lead, member, lat, lon)
     fcst : (valid_time, lead, member, lat, lon)    usually one valid_time; same leads and grid
+                                                   (extra forecast leads are dropped)
 
 Hindcast variables use the dimension 'hcst_valid_time' (the hindcast years), so that they can
 sit in the same file as the forecast ('valid_time'); otherwise xarray would merge the two
@@ -46,10 +47,11 @@ Deterministic product (ensemble mean)
     where the climatology is 0 or negative, and become very large where it is close to 0
     (e.g. dry seasons), so mask or cap them for display.
 
-Both carry attributes: product, units, hindcast period, settings, your `attrs`, and the
+Both carry attributes: product, units, hindcast period, settings, your `attrs`, the
 regridding and aggregation settings carried by the obs (regrid_*, aggregation_*, written by
 postprocess.align_grid and postprocess.aggregate), which postprocess.align_obs_to_product
-uses to prepare new obs exactly like the hindcast obs.
+uses to prepare new obs exactly like the hindcast obs, and the bias-correction settings
+carried by the hindcast (bias_correction_*, written by bias_correction.bias_correct).
 Every variable has 'long_name', 'units' and 'description' attributes (from VARIABLES, and
 skill.DESCRIPTIONS for skill_*): values, anomalies and thresholds
 are in the units of the variable, percent anomalies in %, probabilities as fractions (0-1),
@@ -63,8 +65,10 @@ Later, with the obs of the forecast period aligned with the forecast:
 
 from __future__ import annotations
 
+import numpy as np
 import xarray as xr
 
+from postprocess import _log
 from categories import Categories, quiet_nan_warnings
 from skill import hindcast_skill
 
@@ -88,13 +92,38 @@ def _skill(scores, **inputs):
     return {f"skill_{name}": skill[name] for name in skill}
 
 
-def _finish(product, obs, name, settings, attrs, path):
+def _align_inputs(obs, hcst, fcst):
+    """
+    Forecast lead times the hindcast lacks (the extra lead that staggered initialisations
+    can give) are dropped with a message. Otherwise obs, hcst and fcst must have the same
+    lead times and grid: an error is raised, since xarray arithmetic would silently drop
+    the leads or grid points that differ. Returns fcst.
+    """
+    f, h = fcst["effective_lead_time"].values, hcst["effective_lead_time"].values
+    extra = f[~np.isin(f, h)]
+    if extra.size:
+        _log(f"products: dropping forecast lead times not in the hindcast: "
+             f"{extra.astype('timedelta64[D]').astype(int).tolist()} (days)")
+        fcst = fcst.sel(effective_lead_time=f[np.isin(f, h)])
+    try:
+        xr.align(obs, hcst, fcst, join="exact", exclude=["valid_time", "member"])
+    except ValueError as err:
+        raise ValueError("obs, hcst and fcst must have the same effective_lead_time, latitude "
+                         f"and longitude; align them in the pipeline first\n{err}") from None
+    return fcst
+
+
+def _finish(product, obs, hcst, name, settings, attrs, path):
     """Attributes, tidy coordinates, write."""
     product = _annotate(product, obs.attrs.get("units", ""))
     # regridding and aggregation settings carried by the obs (from align_grid / aggregate),
     # needed to prepare new obs the same way (postprocess.align_obs_to_product)
     product.attrs.update({k: v for k, v in obs.attrs.items()
                           if k.startswith(("regrid_", "aggregation_"))})
+    # bias-correction settings carried by the hindcast (from bias_correction.bias_correct),
+    # for traceability
+    product.attrs.update({k: v for k, v in hcst.attrs.items()
+                          if k.startswith("bias_correction_")})
     years = obs["valid_time"].dt.year.values
     product.attrs.update(product=name, units=obs.attrs.get("units", ""),
                          hindcast_period=f"{years.min()}-{years.max()}",
@@ -165,9 +194,16 @@ def make_probabilistic_product(obs, hcst, fcst, quantiles=None, *, thresholds=No
     scores     : hindcast scores to store (names from skill.SKILL_SCORES); [] for none.
                  Ensemble scores (crpss, groc) can be added too.
     path       : if given, the product is also written to this netCDF file
-    attrs      : extra attributes to record, e.g. {"aggregation": "weekly", "bc_method": "eqm"}
+    attrs      : extra attributes to record, e.g. {"model": "ECMWF", "variable": "tp"}
+                 (regridding, aggregation and bias-correction settings are recorded
+                 automatically)
+
+    Returns the product Dataset (see module docstring). obs, hcst and fcst must have the
+    same lead times and grid (ValueError otherwise), except that forecast lead times the
+    hindcast lacks are dropped with a message.
     """
     obs = _drop_member_copies(obs)
+    fcst = _align_inputs(obs, hcst, fcst)
     cats = Categories(quantiles, edges_from, thresholds=thresholds).fit(obs, hcst)
 
     hcst_prob, obs_cat = cats.apply(hcst), cats.categorise_obs(obs)
@@ -183,7 +219,7 @@ def make_probabilistic_product(obs, hcst, fcst, quantiles=None, *, thresholds=No
                              obs_cat=_hindcast(obs_cat),
                              obs=_hindcast(obs),
                              **skill)
-    return _finish(product, obs, "probabilistic", {}, attrs, path)   # settings: cats attrs
+    return _finish(product, obs, hcst, "probabilistic", {}, attrs, path)   # settings: cats attrs
 
 
 @quiet_nan_warnings()
@@ -198,10 +234,16 @@ def make_deterministic_product(obs, hcst, fcst, *, clim_from="obs",
                 "model" - mean of the hindcast ensemble mean (raw data)
                 Future observations are always compared as obs - clim_obs.
     scores    : hindcast scores to store (deterministic family of skill.SKILL_SCORES)
+    path, attrs : as for make_probabilistic_product
+
+    Returns the product Dataset (see module docstring). obs, hcst and fcst must have the
+    same lead times and grid (ValueError otherwise), except that forecast lead times the
+    hindcast lacks are dropped with a message.
     """
     if clim_from not in ("obs", "model"):
         raise ValueError("clim_from must be 'obs' or 'model'")
     obs = _drop_member_copies(obs)
+    fcst = _align_inputs(obs, hcst, fcst)
     fcst_mean, hcst_mean = fcst.mean("member"), hcst.mean("member")
     clim_obs = obs.mean("valid_time")
     clim = clim_obs if clim_from == "obs" else hcst_mean.mean("valid_time")
@@ -219,4 +261,4 @@ def make_deterministic_product(obs, hcst, fcst, *, clim_from="obs",
                               obs=_hindcast(obs), clim_obs=clim_obs, **skill))
     if clim_from == "model":
         product["clim_model"] = clim
-    return _finish(product, obs, "deterministic", dict(clim_from=clim_from), attrs, path)
+    return _finish(product, obs, hcst, "deterministic", dict(clim_from=clim_from), attrs, path)
