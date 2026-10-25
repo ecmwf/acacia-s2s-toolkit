@@ -19,7 +19,6 @@ __all__=[
          "align_grid",
          "set_verbose",
          "aggregate",
-         "align_to_nominal_forecast_time",
          "hcst_to_effective_lead_time",
          "fcst_to_effective_lead_time",
          "align_obs_to_model_time",
@@ -601,92 +600,6 @@ def aggregate(
     aggdata = aggdata.assign_attrs(attrs)
 
     return aggdata
-
-
-
-
-
-def align_to_nominal_forecast_time(rf_set):
-    '''
-    Group downloaded reforecast members by their nominal initialisation date.
-    by Josh T.
-
-    The nominal initialisation date of each member is hc_init_date - lag (lag in days).
-    For each nominal date, all (hc_init_date, member) combinations that belong to it are
-    stacked into a single member dimension, and the valid_time axis is shifted by the lag
-    (valid_time - lag) so that it is the same for all of them; the data themselves are
-    not shifted.
-
-    Parameters
-    ----------
-    rf_set : Dataset or DataArray with dims (hc_init_date, member, lead_time, latitude,
-        longitude) and coordinates lag (days, along hc_init_date and/or member) and
-        valid_time (along hc_init_date and lead_time).
-
-    Returns
-    -------
-    Same type, dims (hc_nominal_init_date, member, lead_time, latitude, longitude), with
-    coordinates lag (member) and valid_time (hc_nominal_init_date, lead_time). Every
-    nominal date must have the same number of members.
-
-    Raises
-    ------
-    ValueError
-        If the lag-shifted valid times differ between the members of a nominal date.
-    '''
-    lag_days = rf_set['lag'] * np.timedelta64(1,'D')
-    valid_time_lagged = (rf_set.valid_time - lag_days)
-    hc_nominal_init_date = (rf_set.hc_init_date - lag_days)
-
-    rf_set = rf_set.assign_coords(hc_nominal_init_date=hc_nominal_init_date,
-                                  valid_time=valid_time_lagged,)
-
-    nominal_dates = np.unique(hc_nominal_init_date.values)
-
-    nominal_sets = []
-
-    for nominal_date in nominal_dates:
-        # Stack each native initialisation/member combination
-        subset = rf_set.stack(source_member=("hc_init_date", "member"))
-
-        # Select the members belonging to this nominal initialisation
-        mask = (subset["hc_nominal_init_date"] == nominal_date).compute()
-
-        subset = subset.isel(source_member=np.flatnonzero(mask.values))
-
-        # Retrieve the aligned valid-time axis.
-        # It should be the same across all selected members.
-        valid_time = subset["valid_time"].isel(source_member=0)
-
-        # Sanity check: all members should have identical aligned valid times
-        expected_valid_time = valid_time.broadcast_like(subset["valid_time"])
-
-        if not np.array_equal(subset["valid_time"].values,expected_valid_time.values,):
-            raise ValueError(
-                f"Aligned valid times differ between members for "
-                f"{nominal_date!s}"
-            )
-
-        # Preserve the original lag before resetting the stacked index
-        lag = subset["lag"].reset_index("source_member", drop=True)
-
-        # Remove coordinates inherited from the stacked dimensions
-        subset = subset.reset_index("source_member", drop=True)
-
-        subset = subset.rename(source_member="member")
-        subset = subset.assign_coords(member=np.arange(subset.sizes["member"]),lag=("member", lag.values),valid_time=("lead_time", valid_time.values),)
-
-        # Add the new nominal initialisation dimension as a single value
-        subset = subset.drop_vars("hc_nominal_init_date",errors="ignore",)
-        subset = subset.assign_coords(hc_nominal_init_date=np.datetime64(nominal_date))
-
-        nominal_sets.append(subset)
-
-    result = xr.concat(nominal_sets,dim="hc_nominal_init_date",join="exact",coords=["valid_time"])
-
-    output_rf_set = result.transpose("hc_nominal_init_date","member","lead_time","latitude","longitude",)
-
-    return output_rf_set
 
 
 
