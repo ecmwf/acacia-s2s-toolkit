@@ -3,7 +3,7 @@ Welcome to acacia_s2s_toolkit's documentation!
 
 **acacia_s2s_toolkit** is a Python library designed to support sub-seasonal operational forecasting and model evaluation. Specifically, this python wrapper is designed to support ACACIA partners, however it can be used by collaborators. 
 
-The S2S Database is a global archive of sub-seasonal forecasts and re-forecasts established by the joint World Weather Research Programme (WWRP) and World Climate Research Programme (WCRP) Sub-seasonal to Seasonal Prediction project.  It is hosted by the UK’s European Centre for Medium-range Weather Forecasts (ECMWF) and can be accessed via the `ECMWF Data Store <https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview>`_.  
+The S2S Database is a global archive of sub-seasonal forecasts and re-forecasts established by the joint World Weather Research Programme (WWRP) and World Climate Research Programme (WCRP) Sub-seasonal to Seasonal Prediction project.  It is hosted by the European Centre for Medium-range Weather Forecasts (ECMWF) and can be accessed via the `ECMWF Data Store <https://ecds.ecmwf.int/datasets/s2s-forecasts?tab=overview>`_.  
 
 The python wrapper pulls data from the ECMWF Data Store through creating appropriate request scripts to retrieve data efficiently.
 
