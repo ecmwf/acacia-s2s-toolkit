@@ -505,7 +505,7 @@ def output_formatted_leadtimes(leadtime_hour, fcdate, variable, origin_id,period
             step_hours = int(pos.min())
 
     # ---------- MODEL-SPECIFIC MINIMUM VALID START ----------
-    is_jma = (origin_id == "rjtd")
+    is_jma = origin_id in ("rjtd", "rksl") # is JMA or KMD
     is_instant_24 = (step_hours == 24 and not time_resolution.startswith("aver"))
     model_min_start_h = 24 if (is_jma and is_instant_24) else 0
 
@@ -597,7 +597,7 @@ def create_reforecast_dates(rfyears,rfdate):
         rf_dates = ','.join(f'"{date}"' for date in stored_dates) 
     return rf_dates
  
-def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,leadtime_hour,start_lt,end_lt,period,fc_enslags):
+def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,grid,plevs,start_lt,end_lt,period,fc_enslags):
     # check variable name. Is the variable name one of the abbreviations?
     argument_check.check_requested_variable(variable)
     # is it a sfc or pressure level field. # output sfc or level type
@@ -636,13 +636,11 @@ def check_and_output_all_fc_arguments(variable,model,fcdate,area,data_format,gri
     argument_check.check_fc_enslags(fc_enslags)
 
     # if leadtime_hour = None, get leadtime_hour (output all hours).
-    if leadtime_hour is None:
-        if end_lt == None:
-            end_lt = int(get_single_parameter(origin_id, fcdate, 'fcLength'))
-        print (f'start_lt {start_lt}')
-        leadtime_hour = output_leadtime_hour(variable,origin_id,start_lt,end_lt,period,filter_accumulation=True)
-    else:
-        leadtime_hour = np.array(leadtime_hour) # make leadtime hour an array
+    if end_lt == None:
+        end_lt = int(get_single_parameter(origin_id, fcdate, 'fcLength'))
+    print (f'start_lt {start_lt}')
+    leadtime_hour = output_leadtime_hour(variable,origin_id,start_lt,end_lt,period,filter_accumulation=True)
+    
     print (f"For the following variable '{variable}' using the following leadtimes '{leadtime_hour}'.")
 
     # check leadtime_hours (as individuals can choose own leadtime_hours).

@@ -32,7 +32,6 @@ class SuppressOutput:
 def download_hindcast(variable,
                       model='ECMWF',
                       fcdate=None,
-                      leadtime_hour=None,
                       start_lt=0,
                       end_lt=None,
                       period='1D',
@@ -81,8 +80,6 @@ def download_hindcast(variable,
         Output format, e.g. "netcdf" or "grib".
     grid : str
         Grid resolution as "dlonxdlat", e.g. "1.5x1.5".
-    leadtime_hour : optional
-        Forecast lead hours passed to downstream request logic.
     rf_years : optional
         Hindcast years passed to downstream request logic.
     rf_enslags : optional
@@ -156,10 +153,7 @@ def download_hindcast(variable,
     start_lt = argument_output.convert_dayofweek_to_leadtime(fcdate, start_lt)
 
     # if leadtime_hour is set, no aggregation!
-    if leadtime_hour:
-        aggregation_switch = False
-    else:
-        aggregation_switch = True
+    aggregation_switch = True
 
     # Get parameters
     leveltype, plevs, webapi_param, ecds_varname, origin_id, leadtime_hour, fc_enslags = (
@@ -171,7 +165,6 @@ def download_hindcast(variable,
             data_format,
             grid_for_request,
             plevs,
-            leadtime_hour,
             start_lt,
             end_lt,
             period,
@@ -199,8 +192,8 @@ def download_hindcast(variable,
         else:
             north, west, south, east = bbox_bounds
             bounds_str = (
-                f"{format_coord(north, lat=True)}_{format_coord(west, lat=False)}_"
-                f"{format_coord(south, lat=True)}_{format_coord(east, lat=False)}"
+                f"{grid_functions.format_coord(north, lat=True)}_{grid_functions.format_coord(west, lat=False)}_"
+                f"{grid_functions.format_coord(south, lat=True)}_{grid_functions.format_coord(east, lat=False)}"
             )
             filename = f"{variable}_{model}_{fcdate}{plev_str}_{bounds_str}_hc"
 
