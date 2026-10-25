@@ -42,7 +42,6 @@ nb_execution_mode = "off"
 # -- Options for HTML output
 
 html_logo = os.path.abspath("acacia_logo.png")
-autodoc_mock_imports = ["esmpy", "xesmf"]
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
