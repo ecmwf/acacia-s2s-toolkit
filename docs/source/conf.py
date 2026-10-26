@@ -20,7 +20,7 @@ copyright = '2025, Joshua Talib + ACACIA contributors'
 author = 'Joshua Talib'
 
 release = '1.0'
-version = '1.1.4'
+version = '2.0'
 
 # -- General configuration
 html_theme = "sphinx_rtd_theme"

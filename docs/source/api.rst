@@ -51,7 +51,7 @@ Bias correction
 Generation of forecast products
 -------------------------------
 
-.. automodule:: toolkit_extension.products
+.. automodule:: acacia_s2s_toolkit.products
    :members:
    :undoc-members:
    :show-inheritance:
@@ -59,12 +59,12 @@ Generation of forecast products
 Forecast verification
 ---------------------
 
-.. automodule:: toolkit_extension.verify_deterministic
+.. automodule:: acacia_s2s_toolkit.verify_deterministic
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: toolkit_extension.verify_probabilistic
+.. automodule:: acacia_s2s_toolkit.verify_probabilistic
    :members:
    :undoc-members:
    :show-inheritance:

@@ -4,4 +4,5 @@
 #from .postprocess import postprocess_forecast, get_example_data
 
 # Import the version generated from Git during installation.
-from ._version import __version__
+# from ._version import __version__
+
