@@ -37,7 +37,7 @@ Contents
    
 .. toctree::
    :maxdepth: 1
-   :caption: Understanding User Inputs
+   :caption: Inputs to Download Functions
 
    models 
    fc_enslags
@@ -45,19 +45,16 @@ Contents
 
 .. toctree::
    :maxdepth: 1
-   :caption: Understanding Toolkit Outputs
+   :caption: Download Outputs
 
    output
    grid
 
 .. toctree::
    :maxdepth: 1
-   :caption: Example notebooks
+   :caption: Postprocessing Framework
 
-   notebooks/deterministic_forecast_example
-   notebooks/probabilistic_forecast_example
-   notebooks/bias_correction_example
-   notebooks/postprocessing_basic_example
+   postprocessing_framework
 
 .. toctree::
    :maxdepth: 1
@@ -69,6 +66,11 @@ Contents
    theory_bias_correction
    tips_faq
    
+.. toctree::
+   :maxdepth: 1
+   :caption: API
+
+   api
 
    
    

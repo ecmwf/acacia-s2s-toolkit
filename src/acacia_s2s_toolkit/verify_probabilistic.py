@@ -1,7 +1,7 @@
 """
 Verification of an issued probabilistic (category) forecast against the observations that
 have since become available, following the WMO guidance on verifying operational seasonal
-forecasts (WMO-No. 1220).
+forecasts (WMO-No. 1220)::
 
     product = xr.open_dataset("prob.nc")             # from make_probabilistic_product
     skill = verify_probabilistic(product, obs)
@@ -16,7 +16,8 @@ Units: obs in the units of the variable; obs_percentile, interest_rate and
 effective_interest_rate in %; ignorance in bits; probabilities as fractions (0-1); all other
 scores dimensionless (units '-'). Every output variable carries 'units'.
 
-Maps (valid_time, lead, latitude, longitude)
+Maps (valid_time, lead, latitude, longitude)::
+
     obs             the observations of the forecast period, as verified against
     obs_percentile  the observation as a percentile (0-100) of the hindcast-period obs
                     stored in the product, at that grid point and lead time (hindcast values
@@ -32,7 +33,8 @@ Maps (valid_time, lead, latitude, longitude)
                     100 = money doubled, -100 = all lost)
     rps             fair ranked probability score (lower is better)
 
-Scores over the map (valid_time, lead[, category])
+Scores over the map (valid_time, lead[, category])::
+
     heidke          Heidke skill score of the most probable category: (H - E) / (1 - E),
                     H = area fraction of hits (heidke_hits), E = hits expected by chance =
                     climatological probability of the forecast category (1/3 for terciles);
@@ -45,6 +47,7 @@ Scores over the map (valid_time, lead[, category])
     rpss            1 - mean(RPS) / mean(RPS of climatology)
     bss             per category: 1 - mean(BS) / mean(BS of climatology) of the event
                     "obs in this category" (fair Brier score)
+
 With two categories, rpss equals bss of either category.
 
 Ignorance and interest rate are infinite / -100% where the forecast gave 0 probability to
@@ -63,8 +66,8 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 
-from categories import Categories, quiet_nan_warnings
-from verification_common import (DATA_UNITS, area_mean, check_product, finish, obs_percentile, plain,
+from acacia_s2s_toolkit.categories import Categories, quiet_nan_warnings
+from acacia_s2s_toolkit.verification_common import (DATA_UNITS, area_mean, check_product, finish, obs_percentile, plain,
                                  hindcast_obs, prepare_obs, select_scores)
 
 # name: (long_name, units, description); long_name and units label plots
@@ -101,12 +104,20 @@ def verify_probabilistic(product, obs, scores=None):
     """
     Skill of the probabilistic forecast in `product` (see module docstring).
 
-    product : Dataset from make_probabilistic_product (or the saved file)
-    obs     : (valid_time, lead, latitude, longitude), aligned with the forecast, e.g. by
-              postprocess.align_obs_to_product; extra trailing lead times are dropped
-    scores  : names from PROBABILISTIC_SCORES; None = all
+    Parameters
+    ----------
+    product : xarray.Dataset
+        Product from make_probabilistic_product (or the saved file).
+    obs : xarray.DataArray
+        (valid_time, lead, latitude, longitude), aligned with the forecast, e.g. by
+        postprocess.align_obs_to_product; extra trailing lead times are dropped.
+    scores : list of str, optional
+        Names from PROBABILISTIC_SCORES; None (default) = all.
 
-    Returns a Dataset with one variable per score.
+    Returns
+    -------
+    xarray.Dataset
+        One variable per score.
     """
     check_product(product, "probabilistic")
     names = select_scores(scores, PROBABILISTIC_SCORES)

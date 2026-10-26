@@ -62,7 +62,8 @@ import numpy as np
 import xarray as xr
 import xskillscore as xs
 
-from categories import Categories, order_dims, quiet_nan_warnings
+from acacia_s2s_toolkit.categories import Categories, order_dims, quiet_nan_warnings
+
 
 SKILL_SCORES = {
     "prob_binary": ["bs", "bss", "roc"],

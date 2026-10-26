@@ -20,7 +20,8 @@ from functools import partial
 import numpy as np
 import xarray as xr
 
-from xsdba_corrector import BiasCorrector, XsdbaCorrector, _make_lead_blocks
+from acacia_s2s_toolkit.xsdba_corrector import BiasCorrector, XsdbaCorrector, _make_lead_blocks
+from acacia_s2s_toolkit.postprocess import _log
 
 
 #this determines with functions will be publicly visible in the installed package
@@ -32,20 +33,6 @@ __all__=["bias_correct"]
 # helper functions
 #
 #######################################################################################
-
-VERBOSE = True
-
-def set_verbose(v):
-    """Switch log messages (_log) on or off."""
-    global VERBOSE
-    VERBOSE = v
-    print("logging is {}".format(v))
-
-def _log(msg, force=False):
-    """Print `msg` if verbosity is on, or always if force=True."""
-    if VERBOSE | force:
-        print(msg)
-
 
 
 # --------------------------------------------------------------------------- bespoke method
