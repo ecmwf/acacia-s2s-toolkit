@@ -62,7 +62,7 @@ After this, use `download_forecast` to download operational forecasts:
 
 .. note::
 
-    If no leadtime information provided, the download will focus on **daily** aggregation for the **full forecast length** i.e. ``start_lt=0``, ``end_lt=None``, ``period='1D'``
+    If no time information provided, the download will focus on **daily** aggregation for the **full forecast length** i.e. ``start_lt=0``, ``end_lt=None``, ``period='1D'``
 
 - **country_name** (*str*, optional): Country name used to derive bounds automatically from Natural Earth country polygons. Overrides ``bbox_bounds`` and ``region_name`` if provided. Current supported values include:
 

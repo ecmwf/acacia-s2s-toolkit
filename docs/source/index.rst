@@ -34,7 +34,8 @@ Contents
    download_reforecast
    bias_correction
    skill_evaluation
-   
+   api
+
 .. toctree::
    :maxdepth: 1
    :caption: Inputs to Download Functions

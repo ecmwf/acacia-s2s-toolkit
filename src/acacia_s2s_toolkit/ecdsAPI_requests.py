@@ -95,7 +95,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin == 'rjtd' or origin == 'rksl' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
+        if origin in ('rjtd', 'rksl') and leadtimes.startswith('0') and ('accumulated' in time_resolution):
             print ('need to add zero time')
             add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
             add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
@@ -239,7 +239,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin == 'rjtd' or origin == 'rksl' and leadtimes.startswith('0') and ('accumulated' in time_resolution):
+        if origin in ('rjtd', 'rksl') and leadtimes.startswith('0') and ('accumulated' in time_resolution):
             print ('need to add zero time')
             add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
             add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
