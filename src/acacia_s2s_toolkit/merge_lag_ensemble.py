@@ -71,6 +71,7 @@ def merge_all_ens_members(filename,leveltype):
         ds = ds.assign_coords(lead_time=lead_time)
      
         prepared.append(ds)
+        ds.close()
         member_offset += n_members
 
     if np.size(filenames) == 1:
@@ -113,6 +114,7 @@ def merge_all_ens_hindcasts(filename,leveltype):
 
         ds = ds.drop_vars("lag").assign_coords(lag=(("hc_init_date", "member"),lag_2d,))
         prepared.append(ds)
+        ds.close()
         member_offset += n_members
 
     if np.size(filenames) == 1:

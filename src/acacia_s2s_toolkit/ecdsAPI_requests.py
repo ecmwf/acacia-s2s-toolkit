@@ -3,6 +3,7 @@
 
 # script containing all relevant code for producing ecdsAPI requests.
 from acacia_s2s_toolkit import argument_output, merge_lag_ensemble
+from importlib.metadata import version
 import numpy as np
 import os
 import eccodes as ec
@@ -105,15 +106,33 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
             control_fn = f'{filename}_control2_{lag}'
             pert_fn = f'{filename}_perturbed_{lag}'
 
+        control = xr.open_dataset(control_fn,engine='cfgrib')
+        pert = xr.open_dataset(pert_fn,engine='cfgrib')
+
+        # Add ensemble dimension to control if necessary
+        if "number" not in control.dims:
+            control = control.expand_dims(number=[0])
+
+        # Merge control + perturbed ensemble members
+        ds = xr.concat([control, pert], dim="number")
+
+        # Write output
+        ds.to_netcdf(f"{filename}_allens_{lag}")
+
+        print ("no longer using cdo!")
+        control.close()
+        pert.close()
+        ds.close()
+
         # merge both control and perturbed forecast
-        cmd = ["cdo","-O","merge",control_fn,pert_fn,f"{filename}_allens_{lag}",]
-        result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
-        if result.returncode != 0:
-            print(result.stderr)
-            raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+        #cmd = ["cdo","-O","merge",control_fn,pert_fn,f"{filename}_allens_{lag}",]
+        #result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+        #if result.returncode != 0:
+        #    print(result.stderr)
+        #    raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
 
         # add lag component to data
-        ds = xr.open_dataset(f"{filename}_allens_{lag}",engine='cfgrib',decode_timedelta=True)
+        ds = xr.open_dataset(f"{filename}_allens_{lag}",decode_timedelta=True)
         ds = ds.assign_coords(lag=("number",np.full(ds.sizes["number"], lag, dtype=np.int16),))
         ds.to_netcdf(f"{filename}_allens_{lag}.nc")
     
@@ -139,7 +158,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
                     'source': 'Downloaded via acacia_s2s_toolkit',
                     'history': 'Downloaded via acacia_s2s_toolkit',
                     'toolkit': 'acacia_s2s_toolkit',
-                    'toolkit_version': acacia_s2s_toolkit.__version__,
+                    'toolkit_version': version("acacia-s2s-toolkit"),
                     'forecast_initialisation_date': str(fcdate),
                     'origin': origin,
                     'grid': grid,
@@ -249,18 +268,36 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
             control_fn = f'{filename}_control2_{lag}'
             pert_fn = f'{filename}_perturbed_{lag}'
 
+        control = xr.open_dataset(control_fn,engine='cfgrib')
+        pert = xr.open_dataset(pert_fn,engine='cfgrib')
+
+        # Add ensemble dimension to control if necessary
+        if "number" not in control.dims:
+            control = control.expand_dims(number=[0])
+        
+        # Merge control + perturbed ensemble members
+        ds = xr.concat([control, pert], dim="number")
+        
+        # Write output
+        ds.to_netcdf(f"{filename}_allens_{lag}")
+        
+        print ("no longer using cdo!")
+        control.close()
+        pert.close()
+        ds.close()
+ 
         # Merge control and perturbed forecast members into one file.
         # We suppress routine CDO warning noise, but still raise on real failures.
-        cmd = ["cdo","-O","merge",control_fn,pert_fn,f"{filename}_allens_{lag}",]
-        result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
-        if result.returncode != 0:
-            print(result.stderr)
-            raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
+        #cmd = ["cdo","-O","merge",control_fn,pert_fn,f"{filename}_allens_{lag}",]
+        #result = subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+        #if result.returncode != 0:
+        #    print(result.stderr)
+        #    raise subprocess.CalledProcessError(result.returncode, cmd, stderr=result.stderr)
 
         # add lag component to data
-        ds = xr.open_dataset(f"{filename}_allens_{lag}",engine='cfgrib',decode_timedelta=True)
-        ds = ds.assign_coords(lag=("number",np.full(ds.sizes["number"], lag, dtype=np.int16),))
-        ds.to_netcdf(f"{filename}_allens_{lag}.nc")
+        #ds = xr.open_dataset(f"{filename}_allens_{lag}",engine='cfgrib',decode_timedelta=True)
+        #ds = ds.assign_coords(lag=("number",np.full(ds.sizes["number"], lag, dtype=np.int16),))
+        #ds.to_netcdf(f"{filename}_allens_{lag}.nc")
 
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # same process following even with one forecast initialisation date to ensure same structure for all output. 
@@ -292,7 +329,7 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         ),
 
         # Record the software name and version used.
-        'toolkit': f'acacia_s2s_toolkit {acacia_s2s_toolkit.__version__}',
+        'toolkit': version("acacia-s2s-toolkit"),
 
         'variable': variable,
         'grid': grid,

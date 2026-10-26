@@ -1,7 +1,7 @@
 [project]
 # Derive the version from Git tags and commits.
 #dynamic = ["version"]
-version = "2.5"
+version = "2.55"
 name = "acacia_s2s_toolkit"
 authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
@@ -31,6 +31,7 @@ dependencies = [
     "cartopy>=0.22",
     "huracanpy>=1.3.1",
     "geopandas>=1.0.0",
+    "cfgrib>=0.9.15",
     "cdsapi>=0.7.7",
     "xsdba>=0.7.0",
     "xskillscore==0.0.29",
