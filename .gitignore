@@ -1,7 +1,7 @@
 #
 dev/
 install_as_local_package.sh
-example_notebooks/data
+example_notebooks/
 src/acacia_s2s_toolkit/.webAPI_requests.py
 readme_dev.txt
 
