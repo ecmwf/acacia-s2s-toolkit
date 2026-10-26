@@ -2,7 +2,7 @@
 Categories defined by thresholds: fit once, apply to any ensemble or to obs.
 
     cats = Categories([1/3, 2/3]).fit(obs, hcst)         # quantiles (default: terciles)
-    cats = Categories(thresholds=[1.0]).fit(obs, hcst)   # absolute values, e.g. 1 mm/day
+    cats = Categories(thresholds=[1.0]).fit(obs, hcst)   # absolute values, in data units
     hc_prob = cats.apply(hcst)                           # (valid_time, effective_lead_time, category, latitude, longitude)
     fc_prob = cats.apply(fcst)                           # same thresholds
     obs_cat = cats.categorise_obs(obs)                   # 1 in the observed category, else 0

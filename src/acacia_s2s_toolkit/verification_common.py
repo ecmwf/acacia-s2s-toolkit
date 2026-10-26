@@ -26,9 +26,7 @@ import xarray as xr
 SPACE = ["latitude", "longitude"]
 
 
-def _log(msg):          # replace with your package's _log
-    print(msg)
-
+from acacia_s2s_toolkit.postprocess import _log
 
 # --------------------------------------------------------------------------- input checks
 def plain(da):

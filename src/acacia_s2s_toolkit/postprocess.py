@@ -2,31 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import xarray as xr
-from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-import datetime
 import json
-import os,sys,glob
-#import xesmf as xe
-import pooch
+import os
+from contextlib import contextmanager
 
-import xarray_regrid
+import xarray_regrid  # noqa: F401  (registers the .regrid accessor)
+import xarray_regrid.methods.conservative as _xrc
 
 
-#this is for readthedocs to work correctly. These packages cannot be installed by pip, so one has to mock import them
-autodoc_mock_imports = ["esmpy", "xesmf", "netCDF4"]
 
 #this determines with functions will be publicly visible in the installed package
 __all__=[
-         "load_raw_data",
          "read_netcdf",
          "align_grid",
-         "align_grid_sparse",
          "set_verbose",
-         "_log",
          "aggregate",
-         "align_to_nominal_forecast_time",
          "hcst_to_effective_lead_time",
          "fcst_to_effective_lead_time",
          "align_obs_to_model_time",
@@ -43,35 +35,57 @@ __all__=[
 VERBOSE = True
 
 def set_verbose(v):
+    """
+    Switch the package's log messages (_log) on or off.
+
+    Parameters
+    ----------
+    v : bool
+        True to print log messages, False to silence them (messages logged with
+        force=True are always printed). The new setting is printed.
+    """
     global VERBOSE
     VERBOSE = v
     print("verbosity is {}".format(v))
 
 
 def _log(msg, force=False):
+    """
+    Print `msg` if verbosity is on (see set_verbose), or always if force=True.
+    """
     if VERBOSE | force:
         print(msg)
 
 def _check_grid_overlap(obs, hindcast, raise_if_missing=True, threshold=0.9):
     """
-    Check spatial overlap between two lat/lon grids.
+    Check spatial overlap between two latitude/longitude grids.
+
+    The overlap is the intersection of the two latitude/longitude bounding boxes, as a
+    fraction of the smaller box.
 
     Parameters
     ----------
     obs : xarray.DataArray or xarray.Dataset
-        Observational grid containing `lat` and `lon`.
+        Observational grid with `latitude` and `longitude` coordinates.
     hindcast : xarray.DataArray or xarray.Dataset
-        Hindcast grid containing `lat` and `lon`.
+        Hindcast/forecast grid with `latitude` and `longitude` coordinates.
     raise_if_missing : bool, default True
-        If True, raises a ValueError if observations do not fully cover the hindcast/forecast grid.
+        If True, raise a ValueError when the overlap fraction is below `threshold`;
+        if False, only log the overlap fraction.
     threshold : float, optional
         Minimum fraction of overlap relative to the smaller domain
         required to proceed (default: 0.9).
 
+    Returns
+    -------
+    bool
+        True, unless an error is raised.
+
     Raises
     ------
     ValueError
-        If overlap fraction is smaller than the threshold.
+        If the grids do not overlap at all (regardless of raise_if_missing), or if the
+        overlap fraction is smaller than the threshold and raise_if_missing is True.
     """
 
     obs_lat_min = float(obs.latitude.min())
@@ -103,10 +117,8 @@ def _check_grid_overlap(obs, hindcast, raise_if_missing=True, threshold=0.9):
 
     if overlap_fraction < threshold:
         if raise_if_missing:
-            raise ValueError(
-                "Grid overlap too small: {} ".format(np.round(overlap_fraction,2)),
-                "f(threshold {threshold:.0%})"
-            )
+            raise ValueError(f"Grid overlap too small: {overlap_fraction:.2f} "
+                             f"(threshold {threshold:.0%})")
         else:
             _log("Grid overlap : {} ".format(np.round(overlap_fraction,2)))
             return True
@@ -116,7 +128,15 @@ def _check_grid_overlap(obs, hindcast, raise_if_missing=True, threshold=0.9):
 
 def _harmonize_coords(ds):
     """
-    Harmonize coordinate names to standard names: lat, lon, time.
+    Harmonize coordinate names to the package convention: latitude, longitude and, for
+    observation files, time.
+
+    - latitude : coordinates named lat, Latitude, nav_lat or y (also in other letter cases
+      that lower-case to lat, nav_lat or y) are renamed to "latitude".
+    - longitude: lon, Longitude, nav_lon or x (likewise) are renamed to "longitude".
+    - time     : only in files without a "lead_time" coordinate (i.e. observations, not
+      forecasts or hindcasts), coordinates named exactly Time, valid_time or date are
+      renamed to "time".
 
     Parameters
     ----------
@@ -126,19 +146,27 @@ def _harmonize_coords(ds):
     Returns
     -------
     xarray.Dataset or xarray.DataArray
-        Dataset with coordinates renamed to `lat`, `lon`, `time`.
+        Dataset with coordinates renamed as above.
 
     Raises
     ------
     ValueError
-        If latitude or longitude coordinate cannot be identified.
+        If no latitude or longitude coordinate is found after renaming.
     """
+
+
+    #detecting type of file
+
+    check_time=False
+    #forecast and hindcast files have lead time coordinate
+    if "lead_time" not in ds.coords:
+        check_time=True
 
     coord_map = {}
 
-    lat_names = ["lat", "latitude", "Latitude", "nav_lat", "y"]
-    lon_names = ["lon", "longitude", "Longitude", "nav_lon", "x"]
-    time_names = ["time", "Time", "valid_time", "date"]
+    lat_names = ["lat", "Latitude", "nav_lat", "y"]
+    lon_names = ["lon", "Longitude", "nav_lon", "x"]
+    time_names = ["Time", "valid_time", "date"]
 
     for name in ds.coords:
         lname = name.lower()
@@ -149,8 +177,9 @@ def _harmonize_coords(ds):
         elif name in lon_names or lname in lon_names:
             coord_map[name] = "longitude"
 
-#        elif name in time_names or lname in time_names:
-#            coord_map[name] = "time"
+        if check_time:
+            if name in time_names:
+                coord_map[name] = "time"
 
     if len(coord_map)>0:
         _log("Renaming coordinates: {}".format(coord_map))
@@ -179,17 +208,24 @@ def _harmonize_coords(ds):
 
 def read_netcdf(file, variable, units=None):
     """
-    Read a dataset and return the selected variable.
+    Read a NetCDF file and return the selected variable, checked to be daily.
 
-    The function opens a NetCDF file (or collection of files) using xarray,
-    verifies that the requested variable exists, renames variables to the adopted convention (time,lat,lon) and checks that the time
-    coordinate represents daily data.
+    The function opens one NetCDF file with ``xarray.open_dataset``, verifies that the
+    requested variable exists, renames coordinates to the package convention (latitude,
+    longitude and, for observations, time; see _harmonize_coords), optionally sets the
+    units, and checks that the data are daily along their time dimension:
+
+    - observations: "time"
+    - hindcast: "lead_time"
+    - forecast: "valid_time" (calendar dates; its lead_time is a 2-D coordinate)
+
+    The first of time, lead_time, valid_time that is a dimension of the variable is
+    checked; the median step must be between 23 and 25 hours.
 
     Parameters
     ----------
-    file : str or list[str]
-        Path or pattern pointing to NetCDF file(s). Passed to
-        ``xarray.open_mfdataset``.
+    file : str
+        Path to a single NetCDF file.
     variable : str
         Name of the variable to extract from the dataset.
     units : str, optional
@@ -214,7 +250,10 @@ def read_netcdf(file, variable, units=None):
     KeyError
         If the requested variable is not present in the dataset.
     ValueError
-        If the dataset does not appear to contain daily data.
+        If no latitude/longitude coordinate is found; if the variable has none of the
+        dimensions time, lead_time, valid_time; if that dimension has fewer than 3 steps;
+        or if its median step is below 23 hours (sub-daily) or above 25 hours
+        (multi-day aggregates).
     """
 
     _log("\n" + "="*60)
@@ -254,24 +293,35 @@ def read_netcdf(file, variable, units=None):
         _log("setting units to '{}' (in file: '{}')".format(units, da.attrs.get("units", "")))
         da = da.assign_attrs(units=units)
 
-    # just an idiot-check
-    #_log("check if data are daily...")
-    #if da.time.size > 2:
-    #    dt = pd.Series(da.time.values).diff().dropna()
+    _log("check if data are daily...")
+    # forecast "valid_time" (its lead_time is a 2-D coordinate, not a dimension)
+    for timevar in ["time", "lead_time", "valid_time"]:
+        if timevar in da.dims:
+            break
+    else:
+        raise ValueError(f"no time dimension found in {da.dims}; expected one of "
+                         "'time', 'lead_time' or 'valid_time'")
+
+    if da.sizes[timevar] > 2:
+        dt = pd.Series(da[timevar].values).diff().dropna()   # works for dates and timedeltas
 
         # dominant timestep
-    #    median_dt = dt.median()
+        median_dt = dt.median()
 
-     #   if median_dt < pd.Timedelta(hours=23):
-    #        raise ValueError(
-    #            "Dataset appears to be sub-daily (median timestep < 1 day)."
-    #        )
-    #    _log("daily with data time range: {} to {}".format(str(da.time.values[0]),str(da.time.values[-1])))
-    #else:
-    #    raise ValueError(
-    #            "Dataset appears to only one time step. This is not what is expected."
-    #        )
+        if median_dt < pd.Timedelta(hours=23):
+            raise ValueError(
+                f"Dataset appears to be sub-daily (median {timevar} step {median_dt} < 1 day). "
+                "This only processes daily data")
+        elif median_dt > pd.Timedelta(hours=25):
+            raise ValueError(
+                f"Dataset appears to be a multi-day aggregate (median {timevar} step {median_dt} > 1 day). "
+                "This only processes daily data")
 
+        _log("daily, {} from {} to {}".format(timevar, str(da[timevar].values[0]),
+                                              str(da[timevar].values[-1])))
+    else:
+        raise ValueError(f"Dataset has only {da.sizes[timevar]} {timevar} step(s); "
+                         "expected a daily series.")
     _log("all done")
     _log("\n" + "="*60+"\n")
 
@@ -301,28 +351,46 @@ def align_grid(finegrid, coarsegrid, direction="fine_to_coarse", method="conserv
 
     Parameters
     ----------
-    finegrid : DataArray, high resolution, e.g. observations (time, lat, lon).
-    coarsegrid : DataArray, low resolution, e.g. model data
+    finegrid : xarray.DataArray
+        High resolution, e.g. observations (time, latitude, longitude).
+    coarsegrid : xarray.DataArray
+        Low resolution, e.g. model data
         (valid_time, effective_lead_time, member, latitude, longitude).
-    direction : "fine_to_coarse" (default) or "coarse_to_fine".
-        "fine_to_coarse": finegrid is regridded to the coarse grid, conservatively
-                          (area-weighted mean of the fine cells in each coarse cell).
-        "coarse_to_fine": coarsegrid is interpolated bilinearly to the fine grid; fine cells
-                          outside the area spanned by the coarse cell centres get the value
-                          of the nearest coarse cell.
-    method : "conservative" for fine_to_coarse, "bilinear" for coarse_to_fine.
-    raise_if_missing, threshold : passed to _check_grid_overlap.
-    nan_threshold : fine_to_coarse only. Largest fraction of NaN (by area) in a coarse cell
-        for which a value is still computed from the valid part; above it the coarse cell is
-        NaN. Same meaning as xESMF's na_thres (0.5 as in the previous version).
+        Spatial dimensions of both may be named lat/lon or latitude/longitude.
+    direction : {"fine_to_coarse", "coarse_to_fine"}, default "fine_to_coarse"
+
+        - "fine_to_coarse": finegrid is regridded to the coarse grid, conservatively
+          (area-weighted mean of the fine cells in each coarse cell).
+        - "coarse_to_fine": coarsegrid is interpolated bilinearly to the fine grid; fine
+          cells outside the area spanned by the coarse cell centres get the value of the
+          nearest coarse cell.
+
+    method : {"conservative", "bilinear"}, default "conservative"
+        "conservative" for fine_to_coarse, "bilinear" for coarse_to_fine.
+    raise_if_missing : bool
+        stop if grids overlap is less than threshold, otherwise proceed with warning. 
+        Grids that do not overlap at all always raise an error).
+    theshold : float
+        Fraction of the larger grid that is covered by the smaller grid below which error 
+        is risen if raise_if_missing flag is True
+    nan_threshold : float, default 0.5
+        fine_to_coarse only. Largest fraction of NaN (by area) in a coarse cell for which
+        a value is still computed from the valid part; above it the coarse cell is NaN.
 
     Returns
     -------
-    finealigned, coarsealigned : both on the chosen grid, with the dimension names of that
-        grid. Cells without data in either dataset are NaN in both. Attributes are kept, and
-        the regridding settings are added as attributes (regrid_direction, regrid_method,
-        regrid_nan_threshold), so that they reach the products and can be repeated for
-        new observations (align_obs_to_product).
+    finealigned, coarsealigned : xarray.DataArray
+        Both on the chosen grid, with the dimension names of that grid. Cells without data
+        in either dataset (at any time / lead / member) are NaN in both. Attributes are
+        kept, and the regridding settings are added as attributes (regrid_direction,
+        regrid_method, regrid_nan_threshold), so that they reach the products and can be
+        repeated for new observations (align_obs_to_product).
+
+    Raises
+    ------
+    ValueError
+        If direction or method is not one of the allowed values, if no lat/lon dimensions
+        are found, or if the grids do not overlap enough (see _check_grid_overlap).
     """
     _log(" align_grid ".center(60, "="))
 
@@ -378,209 +446,6 @@ def align_grid(finegrid, coarsegrid, direction="fine_to_coarse", method="conserv
 
 
 
-def align_grid_xESMF(finegrid, coarsegrid, direction="fine_to_coarse", method="conservative", raise_if_missing=True, threshold=0.9):
-    """
-    Align two datasets spatially using xESMF, preserving time and member dimensions.
-
-    Parameters
-    ----------
-    finegrid : xarray.DataArray
-        High-resolution dataset with dimensions including `time`, `member`, `lat`, `lon`.
-    coarsegrid : xarray.DataArray
-        Low-resolution dataset with dimensions including `time`, `member`, `lat`, `lon`.
-    direction : {"fine_to_coarse", "coarse_to_fine"}, default "fine_to_coarse"
-        Direction of spatial alignment:
-        - "fine_to_coarse": aggregate finegrid to coarsegrid (conservative regridding)
-        - "coarse_to_fine": interpolate coarsegrid to finegrid (method specifies interpolation)
-    method : str, optional
-        Regridding method when interpolating coarse to fine. Ignored for fine to coarse.
-
-    Returns
-    -------
-    finealigned : xarray.DataArray
-        finegrid dataset aligned to the chosen spatial grid, dims (time, member, lat, lon)
-    coarsealigned : xarray.DataArray
-        coarsegrid dataset aligned to the chosen spatial grid, dims (time, member, lat, lon)
-
-    Notes
-    -----
-    - NaN masking is applied along spatial dimensions only; all time steps and members are preserved.
-    """
-    _log("\n" + "="*60)
-    _log(" START: align_spatial ".center(60, "="))
-    _log("="*60 + "\n")
-
-
-    #while using xESMF, only these make sense. But perhaps it is worth thinking about switch to rioxarray regridded for
-    # coarse_to_fine, as it offers more options than just bilinear
-
-    allowed={"coarse_to_fine":["bilinear"],
-             "fine_to_coarse":["conservative"]
-            }
-
-    if direction not in allowed.keys():
-        raise ValueError("direction must be 'fine_to_coarse' or 'coarse_to_fine'")
-
-    if method not in allowed[direction]:
-        raise ValueError("Only {} methods available for {}".format(",".join(allowed[direction]),direction))
-
-    #checking if grids overlap
-    overlap_check=_check_grid_overlap(finegrid,coarsegrid,raise_if_missing, threshold)
-
-    # select one timestep for weight generation
-    fine_step = finegrid.isel(time=0, drop=True)
-    coarse_step = coarsegrid.isel(valid_time=0,drop=True)
-    if 'member' in fine_step.dims:
-        fine_step = fine_step.isel(member=0)
-    if 'member' in coarse_step.dims:
-        coarse_step = coarse_step.isel(member=0)
-    if 'effective_lead_time' in coarse_step.dims:
-        coarse_step = coarse_step.isel(effective_lead_time=0)
-
-    # Regrid
-    if direction == "fine_to_coarse":
-        _log("Regridding finegrid → coarsegrid (conservative)...")
-        regridder = xe.Regridder(fine_step, coarse_step, "conservative")
-        finealigned = regridder(finegrid, skipna=True, na_thres=0.5, keep_attrs=True)
-        coarsealigned = coarsegrid
-
-    elif direction == "coarse_to_fine":
-        _log("Regridding coarsegrid → finegrid ({} )...".format(method))
-        regridder = xe.Regridder(coarse_step, fine_step, method, extrap_method="inverse_dist")
-        coarsealigned = regridder(coarsegrid, skipna=True, keep_attrs=True)
-        finealigned = finegrid
-
-    else:
-        raise ValueError("direction must be 'fine_to_coarse' or 'coarse_to_fine'")
-
-
-    # Apply spatial masks using the first timestep (time=0)
-    coarsealigned = coarsealigned.where(~np.isnan(finealigned.isel(time=0).data))
-    finealigned = finealigned.where(~coarsealigned.isnull().all(["valid_time","effective_lead_time", "member"]).data)
-
-    attrs=coarsealigned.attrs
-    for attr in coarsegrid.attrs:
-        attrs
-    _log("done")
-    _log("\n" + "="*60+"\n")
-
-
-    return finealigned, coarsealigned
-
-
-
-
-def load_raw_data(nominal_date,
-                        download_dir,
-                        target_domain,
-                        fcst_model,
-                        fcst_var,
-                        obs_file,
-                        obs_var,
-                        verbose=True,
-                       ):
-    """
-    reading raw forecast, hindcast, and observations.
-
-    This function reads forecast, hindcast, and observation NetCDF files.
-
-    Parameters
-    ----------
-    nominal_date : str or datetime-like
-        Nominal initialization date of the forecast. Used to identify
-        the forecast and hindcast files and to align hindcasts with the
-        forecast cycle.
-
-    download_dir : str
-        Directory containing forecast and hindcast NetCDF files.
-
-    target_domain : str
-        Spatial domain identifier used in the input filenames.
-
-    fcst_model : str
-        Forecast model name (e.g., "ECMWF").
-
-    fcst_var : str
-        Forecast variable name in the NetCDF files.
-
-    Returns
-    -------
-    hindcast : xarray.DataArray
-        Hindcast data in original structure with dimensions:
-
-        (lead_time, init_date, member, lat, lon)
-
-    forecast : xarray.DataArray
-        Forecast data in original structure.
-
-    obs : xarray.DataArray
-        Observations data in original structure
-
-        (date, lat, lon)
-
-    Notes
-    -----
-    * ECMWF precipitation (`tp`) is provided as running accumulation and
-      is automatically converted to daily totals.
-
-    """
-
-    #setting up verbosity
-    set_verbose(verbose)
-    _log("logging is on")
-
-
-    #feedback
-    _log("nominal forecast date: {}".format(nominal_date), force=True)
-    _log("download dir: {}".format(download_dir), force=True)
-    _log("domain: {}".format(target_domain), force=True)
-    _log("model: {}".format(fcst_model), force=True)
-    _log("forecast variable: {}".format(fcst_var), force=True)
-    _log("observed file: {}".format(obs_file), force=True)
-    _log("observed variable: {}".format(obs_var), force=True)
-
-
-    #*******
-    # setting things up
-    #*******
-    #this is also validation of nominaldate
-    try:
-        fcst_date=pd.to_datetime(nominal_date)
-    except:
-        raise TypeError("Forecast date does not appear to be valid")
-
-    fcst_date_str=fcst_date.strftime("%Y%m%d")
-    fcst_day=fcst_date.day
-    fcst_mon=fcst_date.month
-    fcst_year=fcst_date.year
-
-    # download function aligns hindcast date with forecast date, so
-    hcst_date=fcst_date
-
-    #*******
-    # processing
-    #*******
-
-    # forecast data file
-    fcst_file="{}/{}_{}_{}_{}_fc.nc".format(download_dir,fcst_var,fcst_model, fcst_date_str, target_domain)
-
-    # hindcast data file
-    hcst_file="{}/{}_{}_{}_{}_hc.nc".format(download_dir,fcst_var,fcst_model, fcst_date_str, target_domain)
-
-    #reading forecast data
-    forecast=read_netcdf(fcst_file, fcst_var)
-
-    #reading hindast
-    hindcast=read_netcdf(hcst_file, fcst_var)
-
-    # reading observed data
-    obs=read_netcdf(obs_file, obs_var)
-
-    #returning arrays
-    return hindcast,forecast,obs
-
-
-
 
 
 # registry of available aggregation functions
@@ -616,8 +481,21 @@ def _count_above(da, dim, threshold=0, **kwargs):
 def _max(da, dim, **kwargs):
     return da.max(dim=dim)
 
+@register_agg("max_dry_spell")
+def _max_dry_spell(da, dim, threshold=1.0, **kwargs):
+    """Longest run of consecutive days with values below `threshold` (dry days) within the
+    window. Missing days interrupt a run; NaN if all days are missing."""
+    dry = da < threshold                       # NaN compares as False: not dry
+    run = xr.zeros_like(dry.isel({dim: 0}, drop=True), dtype=int)
+    longest = run
+    for i in range(da.sizes[dim]):
+        day_dry = dry.isel({dim: i}, drop=True)
+        run = (run + 1) * day_dry              # one more day, or back to 0 if not dry
+        longest = np.maximum(longest, run)
+    return longest.where(da.notnull().any(dim))
+
 # aggregations whose result is a number of days, not a value in the units of the data
-COUNT_METHODS = ("count_zero", "count_above")
+COUNT_METHODS = ("count_zero", "count_above", "max_dry_spell")
 
 
 
@@ -629,27 +507,56 @@ def aggregate(
     dim="effective_lead_time",
     **kwargs):
     """
-    Resample `data` over `dim` into `agg_window`-sized bins, applying
-    the named aggregation function, and masking incomplete trailing windows.
+    Aggregate daily data over `dim` in consecutive windows of `window_size` days.
+
+    The lead times are converted to timedeltas (integers are taken as days) and resampled
+    into windows of `window_size` days with label="left", closed="left": each output lead
+    time is the start of its window, e.g. with window_size=7, lead 7 days covers the daily
+    leads 7 to 13. If the number of steps along `dim` is not a multiple of window_size,
+    the incomplete trailing window is dropped (with a log message). Grid cells that
+    are NaN at all leads (and members / valid times) in the input are NaN in the output.
 
     Parameters
     ----------
     data : xr.DataArray or xr.Dataset
-    window_size : int, e.g. 5
-    method : str, name of a function registered in AGG_FUNCTIONS
-    dim : str, dimension being resampled (default "lead_time")
-    **kwargs : passed through to the aggregation function
+        Daily data, e.g. (valid_time, effective_lead_time, [member,] latitude, longitude).
+    window_size : int
+        Window length in days, between 5 and 50.
+    method : str, default "mean"
+        Name of a function
 
-    The settings are added to the attributes of the output (aggregation_method,
-    aggregation_window and, if any, aggregation_kwargs as JSON text), so that they reach
-    the products and can be repeated for new observations (align_obs_to_product).
-    For counting methods (COUNT_METHODS) the units are set to "days".
+        - "mean", "sum", "max"
+        - "count_zero": number of days equal to 0
+        - "count_above": number of days above `threshold` (passed as a keyword
+          argument; default 0)
+        - "max_dry_spell": longest run of consecutive days below `threshold` within the
+          window (default 1.0, e.g. 1 mm for precipitation); a spell that crosses into
+          the next window is split
+
+    dim : str, default "effective_lead_time"
+        Dimension being aggregated.
+    **kwargs
+        Passed through to the aggregation function (e.g. threshold=1.0).
+
+    Returns
+    -------
+    xr.DataArray or xr.Dataset
+        Same type as data, with `dim` at the window starts. The attributes of the input
+        are kept and the settings are added (aggregation_method, aggregation_window and,
+        if any, aggregation_kwargs as JSON text), so that they reach the products and can
+        be repeated for new observations (align_obs_to_product). For counting methods
+        (COUNT_METHODS) the units are set to "days".
+
+    Raises
+    ------
+    ValueError
+        If method is not registered or window_size is not between 5 and 50.
     """
 
     _log(f"Aggregating lead_time to {window_size}-D blocks using ({method})...")
 
     #arbitrary choice
-    agg_windows=list(range(5,11))
+    agg_windows=list(range(5,51))
 
     #checking if method is available
     if method not in AGG_FUNCTIONS:
@@ -663,9 +570,7 @@ def aggregate(
 
     # validating aggregation window
     if window_size not in agg_windows:
-        raise ValueError(
-            "agg_window must be one of {} got '{}'".format(" ".join(map(str, agg_windows)), window_size)
-        )
+        raise ValueError(f"window_size must be between 5 and 50, got {window_size}")
 
     #agg_window is just window in the xarray format
     agg_window=f"{window_size}D"
@@ -679,11 +584,8 @@ def aggregate(
 
     if n_full < n_total:
         dropped = n_total - n_full
-        print(
-                f"resample_agg: dropping last {dropped} step(s) of '{dim}' "
-                f"({n_total} not divisible by window_size={window_size}); "
-                f"keeping {n_full} steps."
-        )
+        _log(f"aggregate: dropping last {dropped} step(s) of '{dim}' ({n_total} not divisible "
+             f"by window_size={window_size}); keeping {n_full} steps.")
         data = data.isel({dim: slice(0, n_full)})
 
     resampler = data.resample(
@@ -697,7 +599,7 @@ def aggregate(
 
 
     #finding nans
-    dims=["effective_lead_time"]
+    dims=[dim]
     for v in ["member","target_time","valid_time","init_date","init_lag"]:
         if v in data.dims:
             dims.append(v)
@@ -706,9 +608,6 @@ def aggregate(
 
     #removing all nans
     aggdata = aggdata.where(~spatial_nan_mask)
-
-    #bringing the lead_time to days from timedelta
-    #aggdata[dim]=(aggdata[dim]/np.timedelta64(1, 'D')).astype(int)
 
     # attributes of the input plus the aggregation settings
     attrs = dict(data.attrs)
@@ -725,69 +624,6 @@ def aggregate(
 
 
 
-def align_to_nominal_forecast_time(rf_set):
-    '''
-    A function that aligns downloaded reforecast to nominal forecast date.
-    by Josh T.
-    '''
-    lag_days = rf_set['lag'] * np.timedelta64(1,'D')
-    valid_time_lagged = (rf_set.valid_time - lag_days)
-    hc_nominal_init_date = (rf_set.hc_init_date - lag_days)
-
-    rf_set = rf_set.assign_coords(hc_nominal_init_date=hc_nominal_init_date,
-                                  valid_time=valid_time_lagged,)
-
-    nominal_dates = np.unique(hc_nominal_init_date.values)
-
-    nominal_sets = []
-
-    for nominal_date in nominal_dates:
-        # Stack each native initialisation/member combination
-        subset = rf_set.stack(source_member=("hc_init_date", "member"))
-
-        # Select the members belonging to this nominal initialisation
-        mask = (subset["hc_nominal_init_date"] == nominal_date).compute()
-
-        subset = subset.isel(source_member=np.flatnonzero(mask.values))
-
-        # Retrieve the aligned valid-time axis.
-        # It should be the same across all selected members.
-        valid_time = subset["valid_time"].isel(source_member=0)
-
-        # Sanity check: all members should have identical aligned valid times
-        expected_valid_time = valid_time.broadcast_like(subset["valid_time"])
-
-        if not np.array_equal(subset["valid_time"].values,expected_valid_time.values,):
-            raise ValueError(
-                f"Aligned valid times differ between members for "
-                f"{nominal_date!s}"
-            )
-
-        # Preserve the original lag before resetting the stacked index
-        lag = subset["lag"].reset_index("source_member", drop=True)
-
-        # Remove coordinates inherited from the stacked dimensions
-        subset = subset.reset_index("source_member", drop=True)
-
-        subset = subset.rename(source_member="member")
-        subset = subset.assign_coords(member=np.arange(subset.sizes["member"]),lag=("member", lag.values),valid_time=("lead_time", valid_time.values),)
-
-        # Add the new nominal initialisation dimension as a single value
-        subset = subset.drop_vars("hc_nominal_init_date",errors="ignore",)
-        subset = subset.assign_coords(hc_nominal_init_date=np.datetime64(nominal_date))
-
-        nominal_sets.append(subset)
-
-    result = xr.concat(nominal_sets,dim="hc_nominal_init_date",join="exact",coords=["valid_time"])
-
-    output_rf_set = result.transpose("hc_nominal_init_date","member","lead_time","latitude","longitude",)
-
-    return output_rf_set
-
-
-
-
-
 
 
 
@@ -796,11 +632,21 @@ def _find_cycles(init_dates, max_gap=None):
     Group sorted init dates into cycles of staggered initialisations.
 
     A new cycle starts wherever the gap to the previous init date exceeds `max_gap`.
-    max_gap : timedelta-like (e.g. "10D"), or None to infer it: with all gaps equal there is
-              a single cycle (e.g. a forecast); otherwise the threshold is the geometric mean
-              of the smallest and largest gap (2 days and ~1 year -> ~27 days).
-    Returns a 2-D array (n_cycles, n_inits_per_cycle) of dates; all cycles must have the
-    same number of inits.
+
+    Parameters
+    ----------
+    init_dates : array-like of datetime64
+        Initialisation dates.
+    max_gap : timedelta-like (e.g. "10D"), optional
+        If None, it is inferred: with all gaps equal there is a single cycle (e.g. a
+        forecast); otherwise the threshold is the geometric mean of the smallest and
+        largest gap (2 days and ~1 year -> ~27 days).
+
+    Returns
+    -------
+    numpy.ndarray
+        2-D array (n_cycles, n_inits_per_cycle) of dates; all cycles must have the same
+        number of inits.
     """
     dates = np.sort(np.asarray(init_dates))
     if len(dates) == 1:
@@ -834,42 +680,68 @@ def _check_daily_leads(leads, name):
 
 
 def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim=False, max_gap=None,
-                      init_dim="hc_init_date", lead_dim="lead_time", member_dim="member",
                       drop_coords=("valid_time",)):
     """
-    Combine staggered initialisations into cycles with a common lead-time axis.
+    Combine staggered hindcast initialisations into cycles with a common lead-time axis.
 
     Parameters
     ----------
-    ds : Dataset or DataArray with dims (init_dim, lead_dim, member_dim, ...).
-         lead_dim must be daily (timedelta, steps of 1 day); otherwise ValueError.
-         Aggregate only after restructuring.
-    n_inits_per_cycle : number of initialisations per cycle. If None (default) the cycles are
-         inferred from gaps between init dates (see find_cycles); if given, it is checked
-         against the inferred grouping.
-    max_gap : passed to find_cycles; only needed if the automatic grouping fails.
-    anchor : "earliest" or "latest". Date that labels the cycle and from which
-         effective_lead_time is counted. Default: "earliest", or "latest" if trim=True.
-         "earliest": later inits start later -> NaN at their first leads.
-         "latest"  : earlier inits are cut before the anchor and end earlier ->
-                     NaN at their last leads.
-         Without trimming, the effective_lead_time axis has the same values as lead_dim.
-    trim : if True, keep only effective lead times covered by every initialisation (no NaN
-         from the staggering). Requires anchor="latest" (the default when trim=True); the
-         trailing leads where earlier inits have already ended are removed.
-    drop_coords : coordinates along (init_dim, lead_dim) to drop; they would be wrong after
-         shifting. 'target_time' (= valid_time + effective_lead_time) is added instead.
+    ds : xarray.Dataset or xarray.DataArray
+        Dims (hc_init_date, lead_time, member, ...), e.g.
+        (hc_init_date, lead_time, member, latitude, longitude).
+        lead_time must be daily (timedelta, steps of 1 day); otherwise ValueError.
+        Aggregate only after restructuring.
+    n_inits_per_cycle : int, optional
+        Number of initialisations per cycle. If None (default) the cycles are inferred
+        from gaps between init dates (see _find_cycles); if given, it is checked against
+        the inferred grouping.
+    anchor : {"earliest", "latest"}, optional
+        Date that labels the cycle (valid_time) and from which effective_lead_time is
+        counted. Default: "earliest", or "latest" if trim=True.
+
+        - "earliest": later inits start later, so NaN at their first leads.
+        - "latest": earlier inits are cut before the anchor and end earlier, so NaN at
+          their last leads.
+
+        The effective_lead_time axis has the values of lead_time (minus the trailing
+        leads removed by trim); it starts at 0 only if lead_time starts at 0.
+    trim : bool, default False
+        If True, keep only effective lead times covered by every initialisation (no NaN
+        from the staggering). Requires anchor="latest" (the default when trim=True); the
+        trailing leads where earlier inits have already ended are removed.
+    max_gap : timedelta-like, optional
+        Passed to _find_cycles; only needed if the automatic grouping fails.
+    drop_coords : tuple of str, default ("valid_time",)
+        Coordinates along (hc_init_date, lead_time) to drop; they would be wrong after
+        shifting. 'target_time' (= valid_time + effective_lead_time) is added instead.
 
     Returns
     -------
-    Same type as ds, dims (valid_time, effective_lead_time, member, ...), with coordinates
-      init_date(valid_time, member) : actual initialisation date of each member
-      init_lag(valid_time, member)  : init_date - valid_time (timedelta)
-      target_time(valid_time, effective_lead_time)
-    plus any other coordinates along (init_dim, member_dim), e.g. 'lag', as (valid_time, member).
-    Data variables are float with NaN where an initialisation has no data; their on-disk
-    packing (integer dtype, scale_factor, _FillValue) is cleared so that NaN survives saving.
+    xarray.Dataset or xarray.DataArray
+        Same type as ds, dims (valid_time, effective_lead_time, member, ...), with:
+
+        - valid_time: the anchor init date of each cycle
+        - effective_lead_time: timedelta64[ns]
+        - member: members of all inits of the cycle (n_inits x n_members)
+        - init_date (valid_time, member): actual initialisation date of each member
+        - init_lag (valid_time, member): init_date - valid_time (timedelta)
+        - target_time (valid_time, effective_lead_time)
+
+        plus any other coordinates along (hc_init_date, member), e.g. 'lag', as
+        (valid_time, member). Data variables are float with NaN where an initialisation
+        has no data; their on-disk packing (integer dtype, scale_factor, _FillValue) is
+        cleared so that NaN survives saving.
+
+    Raises
+    ------
+    ValueError
+        If ds lacks one of the dimensions hc_init_date, lead_time, member; if anchor is
+        invalid or trim=True with anchor="earliest"; if lead_time is not daily; if the
+        cycles found do not match n_inits_per_cycle or have different numbers of inits;
+        if inits within a cycle are not whole days apart.
     """
+    init_dim, lead_dim, member_dim = "hc_init_date", "lead_time", "member"
+    _require_dims(ds, (init_dim, lead_dim, member_dim), "hindcast")
     if anchor is None:
         anchor = "latest" if trim else "earliest"
     if anchor not in ("earliest", "latest"):
@@ -930,27 +802,55 @@ def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim
 
 
 
-def fcst_to_effective_lead_time(fc, *, leads=None, time_dim="valid_time", member_dim="member",
-                                init_coord="fc_init_date", drop_coords=("lead_time",)):
+def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
     """
     Bring a forecast that is already on a calendar-date axis into the same format as
-    to_effective_init(hindcast, trim=True).
+    hcst_to_effective_lead_time(hindcast, trim=True).
 
-    Input  : (valid_time, member, lat, lon) where valid_time are target dates and each member
-             has its initialisation date in coordinate `init_coord` (member,).
-    Output : (valid_time: 1, effective_lead_time, member, lat, lon)
-             valid_time          = first date (from the latest initialisation on) at which
-                                   every member has data
-             effective_lead_time = target date - valid_time, starting at 0 (as for the hindcast)
-             coords init_date, init_lag (= init_date - valid_time) (valid_time, member),
-             target_time (valid_time, effective_lead_time), other member coords (e.g. 'lag')
-             as (valid_time, member).
+    Input: (valid_time, member, latitude, longitude), daily, where valid_time are target
+    dates and each member has its initialisation date in coordinate fc_init_date
+    (member,).
 
-    leads : effective lead times to keep, e.g. hcst.effective_lead_time, so that forecast and
-            hindcast have identical lead axes; an error is raised if a requested lead is
-            missing or if any member has no data at it. If None, all leads up to the last one
-            at which every member has data are kept (like trim=True).
+    Output: (valid_time: 1, effective_lead_time, member, latitude, longitude), with:
+
+    - valid_time: first date (from the latest initialisation on) at which every member
+      has data
+    - effective_lead_time: target date - valid_time, starting at 0. This matches the
+      hindcast only if the hindcast's lead_time starts at 0
+      (hcst_to_effective_lead_time keeps the lead_time values).
+    - coords init_date, init_lag (= init_date - valid_time) (valid_time, member),
+      target_time (valid_time, effective_lead_time), and other member coords
+      (e.g. 'lag') as (valid_time, member).
+
+    Parameters
+    ----------
+    fc : xarray.Dataset or xarray.DataArray
+        As described above.
+    leads : array-like of timedelta, optional
+        Effective lead times to keep, e.g. hcst.effective_lead_time, so that forecast and
+        hindcast have identical lead axes; an error is raised if a requested lead is
+        missing or if any member has no data at it. If None, all leads up to the last one
+        at which every member has data are kept (like trim=True).
+    drop_coords : tuple of str, default ("lead_time",)
+        Coordinates to drop, e.g. the forecast's own lead_time.
+
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        Same type as fc, in the output format described above.
+
+    Raises
+    ------
+    ValueError
+        If fc lacks the dimensions valid_time, member or the coordinate fc_init_date; if
+        valid_time is not daily; if no date has data from every member; if `leads` are
+        missing or have members without data.
     """
+    time_dim, member_dim, init_coord = "valid_time", "member", "fc_init_date"
+    _require_dims(fc, (time_dim, member_dim), "forecast")
+    if init_coord not in fc.coords:
+        raise ValueError(f"forecast has no '{init_coord}' coordinate (initialisation date "
+                         "of each member)")
     t = fc[time_dim].values
     _check_daily_leads(t - t[0], time_dim)
     fc = fc.drop_vars([c for c in drop_coords if c in fc.coords])
@@ -994,7 +894,7 @@ def fcst_to_effective_lead_time(fc, *, leads=None, time_dim="valid_time", member
 
     vt = dates[0]                                          # effective lead 0
     out = out.drop_vars("target_time")
-    out = out.rename({init_coord: "init_date"}) if init_coord != "init_date" else out
+    out = out.rename({init_coord: "init_date"})
     out = out.assign_coords(init_lag=out["init_date"] - vt)
     out = out.expand_dims(valid_time=[vt])
     member_coords = [c for c in out.coords if out[c].dims == (member_dim,) and c != member_dim]
@@ -1003,71 +903,6 @@ def fcst_to_effective_lead_time(fc, *, leads=None, time_dim="valid_time", member
     _clear_packing(out)
     return out.transpose("valid_time", "effective_lead_time", member_dim, ...)
 
-
-
-
-
-
-def fcst_to_effective_lead_time_v0(fc, *, leads=None, time_dim="valid_time", member_dim="member",
-                               init_coord="fc_init_date",
-                               drop_coords=("lead_time",)):
-    """
-    Bring a forecast that is already on a calendar-date axis into the same format as
-    to_effective_init(hindcast, trim=True).
-
-    Input  : (valid_time, member, lat, lon) where valid_time are target dates and each member
-             has its initialisation date in coordinate `init_coord` (member,).
-    Output : (valid_time: 1, effective_lead_time, member, lat, lon)
-             valid_time          = latest initialisation date (the anchor)
-             effective_lead_time = target date - anchor
-             coords init_date, init_lag (valid_time, member), target_time
-             (valid_time, effective_lead_time), other member coords (e.g. 'lag') as
-             (valid_time, member).
-
-    leads : effective lead times to keep, e.g. hcst.effective_lead_time, so that forecast and
-            hindcast have identical lead axes; an error is raised if a requested lead is
-            missing or if any member has no data at it. If None, leads at which any member has
-            no data anywhere in the domain (staggering gaps) are removed, like trim=True.
-    """
-    fc = fc.drop_vars([c for c in drop_coords if c in fc.coords])
-    init = fc[init_coord]
-    anchor = init.values.max()
-
-    eff = fc[time_dim].values - anchor
-    out = fc.isel({time_dim: np.flatnonzero(eff >= np.timedelta64(0, "ns"))})
-    out = (out.assign_coords(effective_lead_time=(time_dim, out[time_dim].values - anchor))
-              .swap_dims({time_dim: "effective_lead_time"})
-              .drop_vars(time_dim))
-
-    out = out.assign_coords(effective_lead_time=out["effective_lead_time"].astype("timedelta64[ns]"))
-
-    # staggering gaps: a member with no data anywhere in the domain at a lead
-    def gap_leads(o):
-        first = o if isinstance(o, xr.DataArray) else o[list(o.data_vars)[0]]
-        space = [d for d in first.dims if d not in ("effective_lead_time", member_dim)]
-        gaps = first.isnull().all(space) if space else first.isnull()
-        return gaps.any(member_dim).values
-
-    if leads is None:
-        out = out.isel(effective_lead_time=np.flatnonzero(~gap_leads(out)))   # trim
-    else:
-        leads = np.asarray(leads).astype("timedelta64[ns]")
-        missing = np.setdiff1d(leads, out["effective_lead_time"].values)
-        if missing.size:
-            raise ValueError(f"forecast does not cover leads {missing.astype('timedelta64[D]')}")
-        out = out.sel(effective_lead_time=leads)
-        bad = out["effective_lead_time"].values[gap_leads(out)]
-        if bad.size:
-            raise ValueError(f"some members have no data at leads {bad.astype('timedelta64[D]')}")
-
-    out = out.rename({init_coord: "init_date"}) if init_coord != "init_date" else out
-    out = out.assign_coords(init_lag=out["init_date"] - anchor)
-    out = out.expand_dims(valid_time=[anchor])
-    member_coords = [c for c in out.coords if out[c].dims == (member_dim,) and c != member_dim]
-    out = out.assign_coords({c: out[c].expand_dims(valid_time=[anchor]) for c in member_coords})
-    out = out.assign_coords(target_time=out["valid_time"] + out["effective_lead_time"])
-    _clear_packing(out)
-    return out.transpose("valid_time", "effective_lead_time", member_dim, ...)
 
 
 
@@ -1082,37 +917,59 @@ def _clear_packing(obj):
 ONE_DAY = np.timedelta64(1, "D")
 
 
+def _require_dims(obj, dims, what):
+    """Raise a clear error if `obj` lacks any of the dimensions `dims`."""
+    missing = [d for d in dims if d not in obj.dims]
+    if missing:
+        raise ValueError(f"{what} has no dimension(s) {missing}; found {tuple(obj.dims)}, "
+                         f"expected {tuple(dims)} (plus latitude, longitude)")
 
 
 
 
-
-
-def align_obs_to_model_time(obs, model, *, add_members=False, raise_if_missing=True, obs_time="time",
-              init_dim="valid_time", lead_dim="effective_lead_time", member_dim="member"):
+def align_obs_to_model_time(obs, model, *, add_members=False, raise_if_missing=True):
     """
     Put daily observations on the (valid_time, effective_lead_time) structure of `model`.
 
+    The obs value at target date valid_time + effective_lead_time is taken for every
+    (valid_time, lead) of the model. Dates of both obs and model are normalised to
+    midnight first.
+
     Parameters
     ----------
-    obs : DataArray or Dataset (time, lat, lon), daily, no gaps.
-    model : hindcast or forecast in effective-init format, with daily lead times.
-    add_members : replicate obs along the model's member dim, NaN where a model member has
-          no data anywhere in the domain (e.g. staggering gaps in untrimmed data).
-    raise_if_missing : if True, raise if obs do not cover all model target dates; if False,
-          drop the valid_times (cycles) that are not fully covered, from obs and model.
+    obs : xarray.DataArray or xarray.Dataset
+        (time, latitude, longitude), daily, no gaps.
+    model : xarray.DataArray or xarray.Dataset
+        Hindcast or forecast in effective-init format, with daily lead times.
+    add_members : bool, default False
+        Replicate obs along the model's member dim, NaN where a model member has no data
+        anywhere in the domain (e.g. staggering gaps in untrimmed data).
+    raise_if_missing : bool, default True
+        If True, raise if obs do not cover all model target dates; if False, drop the
+        valid_times (cycles) that are not fully covered, from obs and model.
 
     Returns
     -------
-    obs_aligned : (valid_time, effective_lead_time, [member,] lat, lon), with target_time
-    model_aligned : model, restricted to fully covered valid_times if raise_if_missing=False
+    obs_aligned : xarray.DataArray or xarray.Dataset
+        (valid_time, effective_lead_time, [member,] latitude, longitude), with
+        target_time if the model has that coordinate.
+    model_aligned : xarray.DataArray or xarray.Dataset
+        Model with valid_time normalised to midnight, restricted to fully covered
+        valid_times if raise_if_missing=False.
 
     Raises
     ------
-    ValueError if obs are not daily without gaps, or if the model lead times are not daily
-    (e.g. already aggregated).
+    ValueError
+        If obs lack the time dimension or the model lacks valid_time,
+        effective_lead_time (or member, with add_members=True); if obs are not daily
+        without gaps, if the model lead times are not daily (e.g. already aggregated), or
+        (raise_if_missing=True) if obs do not cover all model target dates.
     """
     _log(" align_obs ".center(60, "="))
+
+    obs_time, init_dim, lead_dim, member_dim = "time", "valid_time", "effective_lead_time", "member"
+    _require_dims(obs, (obs_time,), "obs")
+    _require_dims(model, (init_dim, lead_dim) + ((member_dim,) if add_members else ()), "model")
 
     obs = obs.assign_coords({obs_time: obs.indexes[obs_time].normalize()})
     model = model.assign_coords({init_dim: model.indexes[init_dim].normalize()})
@@ -1173,33 +1030,45 @@ def align_obs_to_product(obs, product, *, raise_if_missing=True):
     product, so that the result can go straight into verify_deterministic /
     verify_probabilistic.
 
-    Steps (settings from the product attributes, written there by align_grid and aggregate):
-      1. grid  - regrid_direction "fine_to_coarse": obs regridded conservatively to the
-                 product grid (regrid_method, regrid_nan_threshold);
-                 "coarse_to_fine": the obs kept their own grid in the pipeline (the model
-                 was interpolated to it), so the product's grid points are taken from the
-                 obs, which must be on the same grid.
-                 Grid cells without forecast data are set to NaN.
-      2. dates - the daily obs of every day covered by the forecast: valid_time + daily
-                 leads from the first lead to the end of the last aggregation window
-                 (as align_obs_to_model_time).
-      3. aggregation - aggregate() with aggregation_method, aggregation_window and
-                 aggregation_kwargs; lead times are the starts of the windows, as in the
-                 product.
+    Steps (settings from the product attributes, written there by align_grid and
+    aggregate):
+
+    1. Grid. regrid_direction "fine_to_coarse": obs regridded conservatively to the
+       product grid with align_grid (regrid_method, regrid_nan_threshold);
+       "coarse_to_fine": the obs kept their own grid in the pipeline (the model was
+       interpolated to it), so the product's grid points are taken from the obs, which
+       must be on the same grid. Grid cells without forecast data are set to NaN.
+    2. Dates. The daily obs of every day covered by the forecast: valid_time + daily
+       leads from the first lead to the end of the last aggregation window (with
+       align_obs_to_model_time).
+    3. Aggregation. aggregate() with aggregation_method, aggregation_window and
+       aggregation_kwargs; lead times are the starts of the windows, as in the product.
 
     Parameters
     ----------
-    obs : DataArray (time, latitude, longitude), daily, as returned by read_netcdf
-          (with units=... if the file's units need replacing).
-    product : product Dataset (make_deterministic_product / make_probabilistic_product, or
-          the saved file).
-    raise_if_missing : passed to align_grid and align_obs_to_model_time; with True (default)
-          an error is raised if the obs do not cover the grid or the forecast dates.
+    obs : xarray.DataArray
+        (time, latitude, longitude), daily, as returned by read_netcdf (with units=...
+        if the file's units need replacing).
+    product : xarray.Dataset
+        Product from make_deterministic_product / make_probabilistic_product, or the
+        saved file.
+    raise_if_missing : bool, default True
+        Passed to align_obs_to_model_time and, for "fine_to_coarse", to align_grid; with
+        True an error is raised if the obs do not cover the forecast dates or the grid.
 
     Returns
     -------
-    DataArray (valid_time, effective_lead_time, latitude, longitude), aligned with the
-    product's forecast.
+    xarray.DataArray
+        (valid_time, effective_lead_time, latitude, longitude), aligned with the
+        product's forecast.
+
+    Raises
+    ------
+    ValueError
+        If the product lacks the regrid_* / aggregation_* attributes; if (coarse_to_fine)
+        the obs are on a different grid; if the obs do not cover the forecast dates; if the
+        aggregated leads differ from the product's; if the obs units differ from the
+        product's.
     """
     _log(" align_obs_to_product ".center(60, "="))
 
@@ -1265,112 +1134,6 @@ def align_obs_to_product(obs, product, *, raise_if_missing=True):
 
 
 
-
-
-
-def align_obs_to_model_time_v0(obs, model, *, add_members=False, raise_if_missing=True, obs_time="time",
-              init_dim="valid_time", lead_dim="effective_lead_time", member_dim="member"):
-    """
-    Put daily observations on the (valid_time, effective_lead_time) structure of `model`.
-
-    Parameters
-    ----------
-    obs : DataArray or Dataset (time, lat, lon), daily, no gaps.
-    model : hindcast or forecast in effective-init format, with daily lead times.
-    add_members : replicate obs along the model's member dim, NaN where a model member has
-          no data anywhere in the domain (e.g. staggering gaps in untrimmed data).
-    raise_if_missing : if True, raise if obs do not cover all model target dates; if False,
-          drop the valid_times (cycles) that are not fully covered, from obs and model.
-
-    Returns
-    -------
-    obs_aligned : (valid_time, effective_lead_time, [member,] lat, lon), with target_time
-    model_aligned : model, restricted to fully covered valid_times if raise_if_missing=False
-
-    Raises
-    ------
-    ValueError if obs are not daily without gaps, or if the model lead times are not daily
-    (e.g. already aggregated).
-    """
-    _log(" align_obs ".center(60, "="))
-
-    obs = obs.assign_coords({obs_time: obs.indexes[obs_time].normalize()})
-    model = model.assign_coords({init_dim: model.indexes[init_dim].normalize()})
-
-    if len(obs[obs_time]) > 1 and (np.diff(obs[obs_time].values) != ONE_DAY).any():
-        raise ValueError("obs must be daily without gaps")
-    leads = model[lead_dim].values.astype("timedelta64[ns]")
-    if len(leads) > 1 and (np.diff(leads) != ONE_DAY).any():
-        raise ValueError(f"model lead times must be daily; found steps of "
-                         f"{sorted(set(np.diff(leads).astype('timedelta64[D]').astype(int).tolist()))} "
-                         "days. Align daily data first, then aggregate model and obs together.")
-
-    # target dates (valid_time, lead)
-    vt = model[init_dim].values
-    dates = vt[:, None] + leads[None, :]
-
-    # coverage
-    have = obs[obs_time].values
-    missing_per_vt = (~np.isin(dates, have)).any(axis=1)
-    _log(f"obs: {str(have[0])[:10]} to {str(have[-1])[:10]} | "
-         f"model targets: {str(dates.min())[:10]} to {str(dates.max())[:10]}")
-    if missing_per_vt.any():
-        if raise_if_missing:
-            raise ValueError(f"obs do not cover {missing_per_vt.sum()} of {len(vt)} valid_times")
-        _log(f"WARNING: dropping {missing_per_vt.sum()} valid_times not covered by obs")
-        keep = ~missing_per_vt
-        model, dates, vt = model.isel({init_dim: keep}), dates[keep], vt[keep]
-    else:
-        _log("obs cover all model target dates")
-
-    # select obs for every (valid_time, lead) at once
-    out = obs.sel({obs_time: xr.DataArray(dates, dims=[init_dim, lead_dim])}).drop_vars(obs_time)
-    out = out.assign_coords({init_dim: vt, lead_dim: model[lead_dim].values})
-    if "target_time" in model.coords:
-        out = out.assign_coords(target_time=model["target_time"])
-
-    if add_members:
-        first = model if isinstance(model, xr.DataArray) else model[list(model.data_vars)[0]]
-        space = [d for d in first.dims if d not in (init_dim, lead_dim, member_dim)]
-        has_data = first.notnull().any(space)                 # (valid_time, lead, member)
-        member_coords = {c: model[c] for c in model.coords
-                         if member_dim in model[c].dims and c != member_dim}
-        out = out.expand_dims({member_dim: model[member_dim].values}).where(has_data)
-        out = out.assign_coords(member_coords)
-
-    order = [init_dim, lead_dim] + ([member_dim] if add_members else [])
-    out = out.transpose(*order, ...)
-    _log("=" * 60)
-    return out, model
-
-
-
-
-
-
-"""
-Spatial alignment of two datasets with xarray-regrid (pip-installable replacement for xESMF).
-
-Note on performance: if the optional package `sparse` is installed (it is a dependency of
-xESMF, among others), xarray-regrid stores its conservative weights as sparse arrays. For
-dense data this is ~300x slower, uses far more memory, and returns sparse-backed results.
-align_grid therefore runs xarray-regrid with dense weights (see _dense_weights).
-"""
-
-#from __future__ import annotations
-
-from contextlib import contextmanager
-
-#import numpy as np
-#import xarray as xr
-import xarray_regrid  # noqa: F401  (registers the .regrid accessor)
-import xarray_regrid.methods.conservative as _xrc
-
-LAT_NAMES = ("lat", "latitude")
-LON_NAMES = ("lon", "longitude")
-
-
-
 @contextmanager
 def _dense_weights():
     """Make xarray-regrid use dense weights even if `sparse` is installed.
@@ -1381,16 +1144,6 @@ def _dense_weights():
         yield
     finally:
         _xrc.sparse = saved
-
-
-def _spatial_names(da):
-    """Names of the latitude and longitude dimensions of `da`."""
-    lat = next((n for n in LAT_NAMES if n in da.dims), None)
-    lon = next((n for n in LON_NAMES if n in da.dims), None)
-    if lat is None or lon is None:
-        raise ValueError(f"no lat/lon dimensions found in {da.dims}; expected one of "
-                         f"{LAT_NAMES} and one of {LON_NAMES}")
-    return lat, lon
 
 
 def _crop_to(src, slat, slon, ref, rlat, rlon):
@@ -1412,29 +1165,62 @@ def _crop_to(src, slat, slon, ref, rlat, rlon):
 def align_grid_sparse(finegrid, coarsegrid, direction="fine_to_coarse", method="conservative",
                raise_if_missing=True, threshold=0.9, nan_threshold=0.5):
     """
-    Put two datasets on the same spatial grid, keeping all other dimensions.
+    Put two datasets on the same spatial grid, keeping all other dimensions; a variant of
+    align_grid for environments where the package `sparse` is installed.
+
+    If `sparse` is installed (it is a dependency of xESMF, among others), xarray-regrid
+    stores its conservative weights as sparse arrays. For dense data this is ~300x slower,
+    uses far more memory, and returns sparse-backed results. This function therefore runs
+    xarray-regrid with dense weights; align_grid does not, and is meant for environments
+    without `sparse`.
+
+    Differences from align_grid:
+
+    - the source grid is first cropped to the extent of the target grid plus one target
+      grid cell (_crop_to), which makes regridding faster;
+    - conservative regridding uses dense weights (_dense_weights).
+
+    As in align_grid, the regridding settings are added as attributes, so products made
+    from its output can be used with align_obs_to_product (which itself uses align_grid).
 
     Parameters
     ----------
-    finegrid : DataArray, high resolution, e.g. observations (time, lat, lon).
-    coarsegrid : DataArray, low resolution, e.g. model data
+    finegrid : xarray.DataArray
+        High resolution, e.g. observations (time, latitude, longitude).
+    coarsegrid : xarray.DataArray
+        Low resolution, e.g. model data
         (valid_time, effective_lead_time, member, latitude, longitude).
-    direction : "fine_to_coarse" (default) or "coarse_to_fine".
-        "fine_to_coarse": finegrid is regridded to the coarse grid, conservatively
-                          (area-weighted mean of the fine cells in each coarse cell).
-        "coarse_to_fine": coarsegrid is interpolated bilinearly to the fine grid; fine cells
-                          outside the area spanned by the coarse cell centres get the value
-                          of the nearest coarse cell.
-    method : "conservative" for fine_to_coarse, "bilinear" for coarse_to_fine.
-    raise_if_missing, threshold : passed to _check_grid_overlap.
-    nan_threshold : fine_to_coarse only. Largest fraction of NaN (by area) in a coarse cell
-        for which a value is still computed from the valid part; above it the coarse cell is
-        NaN. Same meaning as xESMF's na_thres.
+        Spatial dimensions of both may be named lat/lon or latitude/longitude.
+    direction : {"fine_to_coarse", "coarse_to_fine"}, default "fine_to_coarse"
+
+        - "fine_to_coarse": finegrid is regridded to the coarse grid, conservatively
+          (area-weighted mean of the fine cells in each coarse cell).
+        - "coarse_to_fine": coarsegrid is interpolated bilinearly to the fine grid; fine
+          cells outside the area spanned by the coarse cell centres get the value of the
+          nearest coarse cell.
+
+    method : {"conservative", "bilinear"}, default "conservative"
+        "conservative" for fine_to_coarse, "bilinear" for coarse_to_fine.
+    raise_if_missing, threshold : bool, float
+        Passed to _check_grid_overlap (grids that do not overlap at all always raise an
+        error).
+    nan_threshold : float, default 0.5
+        fine_to_coarse only. Largest fraction of NaN (by area) in a coarse cell for which
+        a value is still computed from the valid part; above it the coarse cell is NaN.
+        Same meaning as xESMF's na_thres.
 
     Returns
     -------
-    finealigned, coarsealigned : both on the chosen grid, with the dimension names of that
-        grid. Cells without data in either dataset are NaN in both. Attributes are kept.
+    finealigned, coarsealigned : xarray.DataArray
+        Both on the chosen grid, with the dimension names of that grid. Cells without data
+        in either dataset are NaN in both. Attributes are kept, and regrid_direction,
+        regrid_method and regrid_nan_threshold are added.
+
+    Raises
+    ------
+    ValueError
+        If direction or method is not one of the allowed values, if no lat/lon dimensions
+        are found, or if the grids do not overlap (enough).
     """
     _log(" align_grid ".center(60, "="))
 
@@ -1479,6 +1265,12 @@ def align_grid_sparse(finegrid, coarsegrid, direction="fine_to_coarse", method="
     mask = has_data(finealigned) & has_data(coarsealigned)
     finealigned = finealigned.where(mask)
     coarsealigned = coarsealigned.where(mask)
+
+    # record the settings (where() keeps the attributes)
+    settings = dict(regrid_direction=direction, regrid_method=method,
+                    regrid_nan_threshold=float(nan_threshold))
+    finealigned = finealigned.assign_attrs(settings)
+    coarsealigned = coarsealigned.assign_attrs(settings)
 
     _log(f"done: {int(mask.sum())} of {mask.size} grid cells with data in both")
     _log("=" * 60)

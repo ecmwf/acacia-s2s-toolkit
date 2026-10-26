@@ -25,7 +25,8 @@ deterministic : hcst (members; the ensemble mean is used), obs
 Inputs a family does not need are ignored, so all inputs can be passed at once
 (as the functions in products.py do).
 
-All scores are computed over `dim` (the hindcast years) for every lead time and grid point.
+All scores are computed over valid_time (the hindcast years) for every lead time and grid
+point.
 Each result carries 'long_name', 'units' and 'description' attributes from DESCRIPTIONS:
 crps, rmse and bias are in the units of the variable (taken from obs), all other scores are
 dimensionless (units '-').
@@ -35,8 +36,7 @@ hindcast skill and products always use the same thresholds.
 Conventions
 -----------
 - Thresholds (event / category edges) are absolute values, or quantiles of the observations
-  over all years,
-  per lead time and grid point; the hindcast is categorised with the same thresholds
+  over all years, per lead time and grid point; the hindcast is categorised with the same thresholds
   (edges_from="obs", for bias-corrected data) or with quantiles of its own climatology,
   pooled over years and members (edges_from="model", for raw data). Thresholds are fixed,
   not leave-one-out: a leave-one-out threshold shared by forecast and observed event depends
@@ -62,7 +62,8 @@ import numpy as np
 import xarray as xr
 import xskillscore as xs
 
-from categories import Categories, order_dims, quiet_nan_warnings
+from acacia_s2s_toolkit.categories import Categories, order_dims, quiet_nan_warnings
+
 
 SKILL_SCORES = {
     "prob_binary": ["bs", "bss", "roc"],
@@ -111,7 +112,8 @@ def make_categories(obs, hcst, quantiles=None, *, thresholds=None, edges_from="o
     Inputs for the categorical family (and, per category, for prob_binary): categories
     bounded by climatological quantiles, e.g. [1/3, 2/3] (terciles, the default) or
     [0.1, 0.9] (below 10th / normal / above 90th percentile), or by absolute thresholds,
-    e.g. thresholds=[1.0] (dry / wet days). See categories.Categories.
+    e.g. thresholds=[1.0] (in the units of the data, e.g. dry / wet weeks for weekly totals).
+    edges_from: "obs" (bias-corrected data) or "model" (raw data); see categories.Categories.
 
     Returns dict(hcst_prob, obs_cat, clim_prob, n_members); all but n_members have the
     dim "category":
@@ -129,9 +131,10 @@ def make_categories(obs, hcst, quantiles=None, *, thresholds=None, edges_from="o
 def make_event(obs, hcst, quantile=0.9, side="above", *, threshold=None, edges_from="obs"):
     """
     Inputs for the prob_binary family: the event "above the q-th percentile" (side="above")
-    or "at or below it" (side="below"); with `threshold` (e.g. 1.0 mm/day) the event is
+    or "at or below it" (side="below"); with `threshold` (in the units of the data) the event is
     above / at or below that value instead, and `quantile` is ignored. Same as
-    make_categories with one threshold, keeping one category.
+    make_categories with one threshold, keeping one category; edges_from as there.
+    Returns dict(hcst_prob, obs_cat, clim_prob, n_members) without the category dim.
     """
     if side not in ("above", "below"):
         raise ValueError("side must be 'above' or 'below'")
@@ -151,8 +154,9 @@ def crps_fair(obs, fc):
     return term1 - pair / (2 * m * (m - 1))
 
 
-def loo_climatology_ensemble(obs, dim="valid_time"):
-    """For each case along `dim`, the obs of all other cases as an ensemble."""
+def loo_climatology_ensemble(obs):
+    """For each hindcast year (valid_time), the obs of all other years as an ensemble."""
+    dim = "valid_time"
     n = obs.sizes[dim]
     parts = []
     for i in range(n):
@@ -162,7 +166,7 @@ def loo_climatology_ensemble(obs, dim="valid_time"):
     return xr.concat(parts, dim=obs[dim]).transpose(dim, "member", ...)
 
 
-def groc_score(obs, hcst, dim="valid_time"):
+def groc_score(obs, hcst):
     """
     Generalized discrimination score (Weigel & Mason 2011, MWR 139; Mason & Weigel 2009,
     MWR 137). For every pair of years with different observations: F = P(member of one year >
@@ -170,6 +174,7 @@ def groc_score(obs, hcst, dim="valid_time"):
     of the observations (1/2 credit if F = 0.5). 0.5 = no skill, 1 = perfect. Pairs with tied
     observations (e.g. two dry periods) are not counted. One member: (1 + Kendall's tau) / 2.
     """
+    dim = "valid_time"
     o = obs.transpose(dim, ...)
     f = hcst.transpose(dim, "member", *o.dims[1:])
     ov = o.values.reshape(o.sizes[dim], -1)                         # (n, P)
@@ -197,7 +202,7 @@ def groc_score(obs, hcst, dim="valid_time"):
                         coords={d: o[d] for d in rest if d in o.coords})
 
 
-def two_afc_categorical(obs_cat, hcst_prob, dim="valid_time"):
+def two_afc_categorical(obs_cat, hcst_prob):
     """
     2AFC score for probabilistic forecasts of ordered categories (Mason & Weigel 2009,
     MWR 137, section 3d). For every pair of years in different observed categories:
@@ -206,8 +211,9 @@ def two_afc_categorical(obs_cat, hcst_prob, dim="valid_time"):
     1/2 credit if F = 0.5 (or if both forecasts are certain of the same category).
     0.5 = no skill, 1 = perfect. With two categories it equals the ROC area.
 
-    obs_cat, hcst_prob : (dim, ..., category); obs_cat one-hot (NaN where missing)
+    obs_cat, hcst_prob : (valid_time, ..., category); obs_cat one-hot (NaN where missing)
     """
+    dim = "valid_time"
     o = obs_cat.transpose(dim, "category", ...)
     p = hcst_prob.transpose(*o.dims)
     rest = list(o.dims[2:])
@@ -248,16 +254,17 @@ def _family(score):
 
 # =========================================================================== main
 @quiet_nan_warnings()
-def hindcast_skill(score, *, dim="valid_time", **inputs):
+def hindcast_skill(score, **inputs):
     """
     Skill of a hindcast, per lead time and grid point.
 
     score  : name (see SKILL_SCORES) -> DataArray; or list of names -> Dataset
     inputs : the inputs of the score's family (see module docstring), e.g. **make_event(...)
-    dim    : dimension holding the hindcast years (scored over)
+    Scores are computed over valid_time (the hindcast years).
     """
+    dim = "valid_time"
     if not isinstance(score, str):
-        return xr.Dataset({s: hindcast_skill(s, dim=dim, **inputs)
+        return xr.Dataset({s: hindcast_skill(s, **inputs)
                            for s in score})
 
     family = _family(score)
@@ -268,9 +275,7 @@ def hindcast_skill(score, *, dim="valid_time", **inputs):
 
     # coordinates along the scored dim (e.g. target_time) mean nothing after scoring, and
     # some xskillscore functions carry them through in a garbled form: drop them first
-    dims = [dim] if isinstance(dim, str) else list(dim)
-    inputs = {k: v.drop_vars([c for c in v.coords if c not in v.dims
-                              and set(dims) & set(v[c].dims)])
+    inputs = {k: v.drop_vars([c for c in v.coords if c not in v.dims and dim in v[c].dims])
               if isinstance(v, xr.DataArray) else v
               for k, v in inputs.items()}
 
@@ -320,7 +325,7 @@ def hindcast_skill(score, *, dim="valid_time", **inputs):
             out = xs.Contingency(ob_cat, fc_cat, edges, edges, dim=dim).heidke_score()
             out = out.where(valid.any(dim))
         elif score == "2afc":
-            out = two_afc_categorical(o, p, dim)
+            out = two_afc_categorical(o, p)
 
     # ---------------------------------------------------------------- full ensemble
     elif family == "ensemble_obs":
@@ -331,10 +336,10 @@ def hindcast_skill(score, *, dim="valid_time", **inputs):
             if score == "crps":
                 out = crps
             else:
-                clim = loo_climatology_ensemble(obs, dim)
-                out = 1 - crps / crps_fair(obs, clim).mean(dim)
+                ref = crps_fair(obs, loo_climatology_ensemble(obs)).mean(dim)
+                out = (1 - crps / ref).where(ref > 0)      # ref 0: obs the same every year
         elif score == "groc":
-            out = groc_score(obs, hcst, dim)
+            out = groc_score(obs, hcst)
 
     # ---------------------------------------------------------------- ensemble mean
     elif family == "deterministic":

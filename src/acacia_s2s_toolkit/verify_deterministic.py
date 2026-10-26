@@ -1,6 +1,6 @@
 """
 Verification of an issued deterministic forecast (ensemble mean) against the observations
-that have since become available.
+that have since become available::
 
     product = xr.open_dataset("det.nc")              # from make_deterministic_product
     skill = verify_deterministic(product, obs)
@@ -10,13 +10,16 @@ Inputs, alignment rules, area weighting: see verification_common.py.
 Anomalies are relative to the hindcast climatology stored in the product (clim_obs for the
 observations; the product's own fcst_anomaly for the forecast).
 
-Units: obs, error, obs_anomaly, bias, mae and rmse are in the units of the variable; obs_percentile,
-error_pct and bias_pct in %; acc, msss and sign_agreement are dimensionless (units '-'). Every output variable carries 'units'.
+Units: obs, error, obs_anomaly, bias, mae and rmse are in the units of the variable;
+obs_percentile, error_pct and bias_pct in %; acc, msss and sign_agreement are dimensionless
+(units '-'). Every output variable carries 'units'.
 
-Maps (valid_time, lead, latitude, longitude)
+Maps (valid_time, lead, latitude, longitude)::
+
     obs             the observations of the forecast period, as verified against
     obs_percentile  the observation as a percentile (0-100) of the hindcast-period obs
-                    stored in the product, at that grid point and lead time (hindcast values equal to the obs count half)
+                    stored in the product, at that grid point and lead time (hindcast values
+                    equal to the obs count half)
     error           fcst_mean - obs
     error_pct       100 * (fcst_mean - obs) / clim_obs: the error as a percentage of the
                     climatology (= forecast minus observed percent anomaly). Relative to the
@@ -24,7 +27,8 @@ Maps (valid_time, lead, latitude, longitude)
                     dry week); NaN where the climatology is 0 or negative
     obs_anomaly     obs - clim_obs, to plot next to fcst_anomaly
 
-Scores over the map (valid_time, lead)
+Scores over the map (valid_time, lead)::
+
     bias            mean error
     bias_pct        percent bias: 100 * mean error / mean obs (NaN if mean obs <= 0)
     mae             mean absolute error
@@ -47,8 +51,8 @@ from __future__ import annotations
 import numpy as np
 import xskillscore as xs
 
-from categories import quiet_nan_warnings
-from verification_common import (DATA_UNITS, SPACE, area_mean, area_weights, check_product, finish,
+from acacia_s2s_toolkit.categories import quiet_nan_warnings
+from acacia_s2s_toolkit.verification_common import (DATA_UNITS, SPACE, area_mean, area_weights, check_product, finish,
                                  obs_percentile, plain, hindcast_obs, prepare_obs,
                                  select_scores)
 
@@ -83,19 +87,29 @@ def verify_deterministic(product, obs, scores=None):
     """
     Skill of the deterministic forecast in `product` (see module docstring).
 
-    product : Dataset from make_deterministic_product (or the saved file)
-    obs     : (valid_time, lead, latitude, longitude), aligned with the forecast
-    scores  : names from DETERMINISTIC_SCORES; None = all
+    Parameters
+    ----------
+    product : xarray.Dataset
+        Product from make_deterministic_product (or the saved file).
+    obs : xarray.DataArray
+        (valid_time, lead, latitude, longitude), aligned with the forecast, e.g. by
+        postprocess.align_obs_to_product; extra trailing lead times are dropped.
+    scores : list of str, optional
+        Names from DETERMINISTIC_SCORES; None (default) = all.
 
-    Returns a Dataset with one variable per score.
+    Returns
+    -------
+    xarray.Dataset
+        One variable per score.
     """
     check_product(product, "deterministic")
     names = select_scores(scores, DETERMINISTIC_SCORES)
     obs = prepare_obs(obs, product, "fcst_mean")
-    clim = hindcast_obs(product)
+    hcst_obs = hindcast_obs(product)                 # hindcast-period obs, for percentiles
+    clim = plain(product["clim_obs"])                # their mean, for anomalies
 
     fc, fa = plain(product["fcst_mean"]), plain(product["fcst_anomaly"])
-    oa = obs - product["clim_obs"]
+    oa = obs - clim
     valid = fc.notnull() & obs.notnull()
     err = fc - obs
 
@@ -104,11 +118,10 @@ def verify_deterministic(product, obs, scores=None):
         if name == "obs":
             out[name] = obs
         elif name == "obs_percentile":
-            out[name] = obs_percentile(obs, clim)
+            out[name] = obs_percentile(obs, hcst_obs)
         elif name == "error":
             out[name] = err
         elif name == "error_pct":
-            clim = plain(product["clim_obs"])
             out[name] = 100 * err / clim.where(clim > 0)
         elif name == "obs_anomaly":
             out[name] = oa

@@ -7,6 +7,12 @@ import tomllib  # Use 'import tomllib' if using Python 3.11+
 from pathlib import Path
 import os
 
+
+def _exit_cleanly(app, exception):
+    if exception is None:      # build succeeded: skip the crashing interpreter teardown
+        os._exit(0)
+
+
 # -- Project information
 
 project = 'ACACIA_S2S_TOOLKIT'
@@ -24,6 +30,7 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'nbsphinx',
     'myst_nb'
@@ -42,7 +49,6 @@ nb_execution_mode = "off"
 # -- Options for HTML output
 
 html_logo = os.path.abspath("acacia_logo.png")
-autodoc_mock_imports = ["esmpy", "xesmf"]
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
@@ -50,3 +56,8 @@ epub_show_urls = 'footnote'
 exclude_patterns = [
     'notebooks/*.ipynb',
 ]
+
+
+def setup(app):
+    app.connect("build-finished", _exit_cleanly)
+
