@@ -4,22 +4,22 @@ Bias Correction
 .. important::
     This is a tool being developed by the ACACIA project. Please email feedback to joshua.talib@ecmwf.int.
     
-For bias correction of forecasts and reforecasts, you will need to use the `bias_correction` function from the `bias_correction.py` python module.  The function uses `xsdba <https://xsdba.readthedocs.io/en/latest/#>`_, a Python library for statistical downscaling and bias adjustment.  
+For bias correction of forecasts and reforecasts, you will need to use the `bias_correct` function from the `bias_correction.py` python module.  The function uses `xsdba <https://xsdba.readthedocs.io/en/latest/#>`_, a Python library for statistical downscaling and bias adjustment.  
 
 To import the necessary functions, use the following line of python code:
 
 .. code-block:: python
     
-    from acacia_s2s_toolkit.bias_correction import bias_correction
+    from acacia_s2s_toolkit.bias_correction import bias_correct
 
-After this, use `bias_correction` as follows:
+After this, use `bias_correct` as follows:
 
 .. code-block:: python
 
-   bias_correction(obs, hcst, fcst, # key bias correction data
-		   method="dqm", cv=True, # parameters that define bias correction method
-		   mask="auto", units, return_model 
-		   options) # additional options for xsdba bias correction methods
+   bias_correct(obs, hcst, fcst, # key bias correction data
+		method="dqm", cv=True, # parameters that define bias correction method
+		mask="auto", units, return_model 
+		options) # additional options for xsdba bias correction methods
 
 :Parameters:
 
