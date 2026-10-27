@@ -41,88 +41,119 @@ def refine_combined_array(combined,leveltype,rf=False):
             )
     return combined
 
-def merge_all_ens_members(filename,leveltype):
-    filenames = sorted(glob(f"{filename}_allens_*.nc"),key=lambda x: int(x.split("_allens_")[-1].replace(".nc", ""))) # sort filenames so largest lag goes first
+def merge_all_ens_members(filename, leveltype):
+    filenames = sorted(
+        glob(f"{filename}_allens_*.nc"),
+        key=lambda x: int(x.split("_allens_")[-1].replace(".nc", "")),
+    )  # sort filenames so largest lag goes first
     prepared = []
     member_offset = 0
-        
-    for filename in filenames:
-        ds = xr.open_dataset(filename)
-        n_members = ds.sizes["number"]
-        
-        # Preserve the original step as lead_time before replacing the dimension
-        ds = ds.assign_coords(lead_time=("step", ds["step"].values))
-        
-        # Use the existing valid_time as the dimension
-        ds = (ds.swap_dims({"step": "valid_time"}).drop_vars("step").rename({"number": "member"}))
-        
-        # Give every member a unique index across all lagged forecasts
-        ds = ds.assign_coords(member=np.arange(member_offset,member_offset + n_members,dtype=np.int32,))
-        
-        # Each lag has a different initialisation time.
-        # Expand it so it becomes time(member).
-        init_time = ds["time"].values
-        # use name fc_init_date
-        ds = ds.drop_vars("time").assign_coords(fc_init_date=("member", np.full(n_members, init_time)))
-        
-        # Expand lead_time(valid_time) to lead_time(valid_time, member)
-        lead_time, _ = xr.broadcast(ds["lead_time"],ds["member"],)
-        
-        ds = ds.assign_coords(lead_time=lead_time)
-     
-        prepared.append(ds)
-        ds.close()
-        member_offset += n_members
+
+    for fn in filenames:
+        with xr.open_dataset(fn) as ds_in:
+            n_members = ds_in.sizes["number"]
+
+            # Preserve the original step as lead_time before replacing the dimension
+            ds = ds_in.assign_coords(lead_time=("step", ds_in["step"].values))
+
+            # Use the existing valid_time as the dimension
+            ds = (
+                ds.swap_dims({"step": "valid_time"})
+                .drop_vars("step")
+                .rename({"number": "member"})
+            )
+
+            # Give every member a unique index across all lagged forecasts
+            ds = ds.assign_coords(
+                member=np.arange(
+                    member_offset, member_offset + n_members, dtype=np.int32
+                )
+            )
+
+            # Each lag has a different initialisation time.
+            # Expand it so it becomes time(member).
+            init_time = ds["time"].values
+            ds = ds.drop_vars("time").assign_coords(
+                fc_init_date=("member", np.full(n_members, init_time))
+            )
+
+            # Expand lead_time(valid_time) to lead_time(valid_time, member)
+            lead_time, _ = xr.broadcast(ds["lead_time"], ds["member"])
+            ds = ds.assign_coords(lead_time=lead_time)
+
+            # Load into memory so data remains valid after file closes
+            ds = ds.load()
+
+            prepared.append(ds)
+            member_offset += n_members
 
     if np.size(filenames) == 1:
         combined = prepared[0]
     else:
-        combined = xr.concat(prepared,dim="member",
-                join="exact",          # Require identical valid_time values
-                data_vars="minimal",coords="minimal",compat="override",)
-        
+        combined = xr.concat(
+            prepared,
+            dim="member",
+            join="exact",  # Require identical valid_time values
+            data_vars="minimal",
+            coords="minimal",
+            compat="override",
+        )
+
     return combined
 
-def merge_all_ens_hindcasts(filename,leveltype):
-    filenames = sorted(glob(f"{filename}_allens_*.nc"),key=lambda x: int(x.split("_allens_")[-1].replace(".nc", ""))) # sort filenames so largest lag goes first
+def merge_all_ens_hindcasts(filename, leveltype):
+    filenames = sorted(
+        glob(f"{filename}_allens_*.nc"),
+        key=lambda x: int(x.split("_allens_")[-1].replace(".nc", "")),
+    )  # sort filenames so largest lag goes first
     prepared = []
-    member_offset = 0
 
-    for filename in filenames:
-        ds = xr.open_dataset(filename)
-        n_members = ds.sizes["number"]
+    for fn in filenames:
+        with xr.open_dataset(fn) as ds_in:
+            n_members = ds_in.sizes["number"]
 
-        # Preserve the original step as lead_time before replacing the dimension
-        ds = ds.assign_coords(lead_time=("step", ds["step"].values))
+            # Preserve the original step as lead_time before replacing the dimension
+            ds = ds_in.assign_coords(lead_time=("step", ds_in["step"].values))
 
-        # Use the existing lead_time as the dimension
-        ds = (ds.swap_dims({"step": "lead_time"}).drop_vars("step").rename({"number": "member"}))
+            # Use the existing lead_time as the dimension
+            ds = (
+                ds.swap_dims({"step": "lead_time"})
+                .drop_vars("step")
+                .rename({"number": "member"})
+            )
 
-        # Give every member a unique index across all lagged forecasts
-        ds = ds.assign_coords(member=np.arange(ds.sizes["member"],dtype=np.int32,))
+            # Give every member a unique index across all lagged forecasts
+            ds = ds.assign_coords(member=np.arange(ds.sizes["member"], dtype=np.int32))
 
-        # Each lag has a different initialisation time.
-        # Expand it so it becomes time(member).
-        ds = ds.assign_coords(hc_init_date=("time", ds["time"].values))
-        # use hc_init_time as dimension 
-        ds = ds.swap_dims({"time": "hc_init_date"}).drop_vars("time")
+            # Each lag has a different initialisation time.
+            # Use hc_init_date as the dimension.
+            ds = ds.assign_coords(hc_init_date=("time", ds["time"].values))
+            ds = ds.swap_dims({"time": "hc_init_date"}).drop_vars("time")
 
-        # Expand lag(member) to lag(hc_init_date, member)
-        lag_2d = np.broadcast_to(ds["lag"].values,(
-            ds.sizes["hc_init_date"],
-            ds.sizes["member"],))
+            # Expand lag(member) to lag(hc_init_date, member)
+            lag_2d = np.broadcast_to(
+                ds["lag"].values,
+                (ds.sizes["hc_init_date"], ds.sizes["member"]),
+            )
+            ds = ds.drop_vars("lag").assign_coords(
+                lag=(("hc_init_date", "member"), lag_2d)
+            )
 
-        ds = ds.drop_vars("lag").assign_coords(lag=(("hc_init_date", "member"),lag_2d,))
+            # Load into memory so data remains valid after file closes
+            ds = ds.load()
+
         prepared.append(ds)
-        ds.close()
-        member_offset += n_members
 
     if np.size(filenames) == 1:
         combined = prepared[0]
     else:
-        combined = xr.concat(prepared,dim="hc_init_date",
-                join="exact",          # Require identical lead_time values
-                coords="minimal",compat='override')
+        combined = xr.concat(
+            prepared,
+            dim="hc_init_date",
+            join="exact",  # Require identical lead_time values
+            coords="minimal",
+            compat="override",
+        )
 
     return combined
 
