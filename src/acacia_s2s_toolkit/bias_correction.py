@@ -40,30 +40,39 @@ class MeanVarCorrector(BiasCorrector):
     """
     Correction of mean and spread, per lead time and grid point.
 
-    kind="+" (default; temperature and other unbounded variables) - mean/variance scaling:
+    kind="+" (default; temperature and other unbounded variables): mean/variance scaling::
+
         corrected = (sim - mean_hist) / std_hist * std_ref + mean_ref
-    kind="*" (precipitation and other non-negative variables) - power transformation
-    (Leander & Buishand 2007, J. Hydrol. 332):
+
+    kind="*" (precipitation and other non-negative variables): power transformation
+    (Leander & Buishand 2007, J. Hydrol. 332)::
+
         corrected = a * sim**b
-        b is chosen so that the coefficient of variation (std/mean) of hist**b equals that of
-        ref, then a so that the means match. Output is never negative and zeros stay zero.
-        b is searched in [b_min, b_max]; where the target is outside that range, b is clipped
-        and the spread is only partly corrected. Negative input values are set to 0.
+
+    b is chosen so that the coefficient of variation (std/mean) of hist**b equals that of
+    ref, then a so that the means match. Output is never negative and zeros stay zero.
+    b is searched in [b_min, b_max]; where the target is outside that range, b is clipped
+    and the spread is only partly corrected. Negative input values are set to 0.
 
     Statistics always pool all years (and, for the hindcast, all members). Pooling across
     lead times, as in XsdbaCorrector:
-        "lead"    : statistics per lead time
-        "rolling" : per lead time, from a centred window of `window_size` leads
-                    (truncated at the first and last leads)
-        "blocks"  : one set of statistics per block of `window_size` leads, used for every
-                    lead in the block; a short last block is merged into the previous one
+
+    - "lead": statistics per lead time
+    - "rolling": per lead time, from a centred window of `window_size` leads (truncated
+      at the first and last leads)
+    - "blocks": one set of statistics per block of `window_size` leads, used for every
+      lead in the block; a short last block is merged into the previous one
 
     Parameters
     ----------
-    pooling : "lead" (default), "rolling" or "blocks", as above
-    window_size : leads per window or block (default 7); ignored for pooling="lead"
-    kind : "+" (default) or "*", as above
-    b_min, b_max : search range of the exponent b for kind="*" (default 0.1 to 4.0)
+    pooling : {"lead", "rolling", "blocks"}, default "lead"
+        As above.
+    window_size : int, default 7
+        Leads per window or block; ignored for pooling="lead".
+    kind : {"+", "*"}, default "+"
+        As above.
+    b_min, b_max : float, default 0.1, 4.0
+        Search range of the exponent b for kind="*".
     """
 
     POOLINGS = ("lead", "rolling", "blocks")
@@ -150,9 +159,17 @@ REGISTRY: dict[str, object] = {}
 
 
 def register(name, corrector):
-    """Make a corrector available to bias_correct under `name`.
-    corrector : class (or callable) returning a BiasCorrector; called with the user's
-                options (pooling, window_size and method options)."""
+    """
+    Make a corrector available to bias_correct under `name`.
+
+    Parameters
+    ----------
+    name : str
+        Name to pass as bias_correct(..., method=name).
+    corrector : class or callable
+        Returns a BiasCorrector; called with the user's options (pooling, window_size
+        and method options).
+    """
     REGISTRY[name] = corrector
 
 
@@ -168,12 +185,24 @@ def _match_leads(fcst, hcst):
     f, h = fcst["effective_lead_time"].values, hcst["effective_lead_time"].values
     missing = h[~np.isin(h, f)]
     if missing.size:
-        raise ValueError(f"forecast lacks hindcast lead times {missing}")
+        raise ValueError(f"forecast lacks the hindcast lead times {_days(missing)} (days); "
+                         "convert the forecast with fcst_to_effective_lead_time(..., "
+                         "leads=hcst.effective_lead_time), or trim the hindcast "
+                         "(hcst_to_effective_lead_time(..., trim=True or 'end'))")
     extra = f[~np.isin(f, h)]
     if extra.size:
-        _log(f"bias_correct: dropping {extra.size} forecast lead times not in the hindcast: {extra}")
+        _log(f"bias_correct: dropping {extra.size} forecast lead times not in the hindcast: "
+             f"{_days(extra)} (days)")
         fcst = fcst.sel(effective_lead_time=h)
     return fcst
+
+
+def _days(leads):
+    """Lead times (timedelta64, or numbers of days) as a list of days, for messages."""
+    leads = np.asarray(leads)
+    if np.issubdtype(leads.dtype, np.timedelta64):
+        leads = leads / np.timedelta64(1, "D")
+    return [int(d) if float(d).is_integer() else float(d) for d in leads]
 
 
 def _to_points(da, mask):
@@ -266,31 +295,48 @@ def bias_correct(obs, hcst, fcst=None, method="eqm", *, cv=True, pooling="lead",
 
     Parameters
     ----------
-    obs   : (valid_time, effective_lead_time, latitude, longitude), aligned to hcst
-            (align_obs_to_model_time); a member dimension of identical copies is allowed
-    hcst  : (valid_time, effective_lead_time, member, latitude, longitude)
-    fcst  : (valid_time, effective_lead_time, member, latitude, longitude), optional; any
-            number of members; lead times the hindcast lacks are dropped
-    method : name in REGISTRY ("eqm", "scaling", "dqm", "meanvar", or one added with register)
-    cv : if True (default) the returned hindcast is cross-validated (`leave_out` years at a
-         time), as needed for skill assessment; if False it is corrected in-sample. The
-         forecast is always corrected with the model fitted on all years.
-    pooling : "lead" (default), "rolling" or "blocks": how data are pooled across lead times
-         (see XsdbaCorrector / MeanVarCorrector)
-    window_size : leads per window or block for pooling="rolling" / "blocks" (default 7)
-    leave_out : number of consecutive years left out at a time when cv=True (default 1)
-    mask : "auto" (cells where obs have any data), a boolean (latitude, longitude) array, or
-           None. Cells outside the mask are not corrected and are NaN in the output.
-    units : replaces the 'units' attribute of obs, hcst and fcst (required by the xsdba
-           methods). If None, obs and hcst must have the same 'units' attribute.
-    return_model : also return the corrector fitted on all years.
-    **options : method options, e.g. nquantiles, kind, interp (see XsdbaCorrector and
-           MeanVarCorrector). Options the method does not accept are ignored with a warning.
+    obs : xarray.DataArray
+        (valid_time, effective_lead_time, latitude, longitude), aligned to hcst
+        (align_obs_to_model_time); a member dimension of identical copies is allowed.
+    hcst : xarray.DataArray
+        (valid_time, effective_lead_time, member, latitude, longitude).
+    fcst : xarray.DataArray, optional
+        (valid_time, effective_lead_time, member, latitude, longitude); any number of
+        members. Lead times the hindcast lacks are dropped; it must have all the
+        hindcast's lead times.
+    method : str, default "eqm"
+        Name in REGISTRY: "eqm", "scaling", "dqm", "meanvar", or one added with register.
+    cv : bool, default True
+        If True, the returned hindcast is cross-validated (`leave_out` years at a time), as
+        needed for skill assessment; if False it is corrected in-sample. The forecast is
+        always corrected with the model fitted on all years.
+    pooling : {"lead", "rolling", "blocks"}, default "lead"
+        How data are pooled across lead times (see XsdbaCorrector / MeanVarCorrector).
+    window_size : int, default 7
+        Leads per window or block for pooling="rolling" / "blocks".
+    leave_out : int, default 1
+        Number of consecutive years left out at a time when cv=True.
+    mask : "auto", xarray.DataArray or None, default "auto"
+        "auto" (cells where obs have any data), a boolean (latitude, longitude) array, or
+        None. Cells outside the mask are not corrected and are NaN in the output.
+    units : str, optional
+        Replaces the 'units' attribute of obs, hcst and fcst (required by the xsdba
+        methods). If None, obs and hcst must have the same 'units' attribute.
+    return_model : bool, default False
+        Also return the corrector fitted on all years.
+    **options
+        Method options, e.g. nquantiles, kind, interp (see XsdbaCorrector and
+        MeanVarCorrector). Options the method does not accept are ignored with a warning.
 
     Returns
     -------
-    hcst_bc, fcst_bc            (fcst_bc is None if fcst is None)
-    hcst_bc, fcst_bc, model     if return_model
+    hcst_bc : xarray.DataArray
+        Bias-corrected hindcast.
+    fcst_bc : xarray.DataArray or None
+        Bias-corrected forecast; None if fcst is None.
+    model : BiasCorrector
+        Only if return_model: the corrector fitted on all years.
+
     The settings are recorded as attributes of hcst_bc and fcst_bc: bias_correction_method,
     bias_correction_pooling, bias_correction_window, bias_correction_cv,
     bias_correction_leave_out (hindcast, if cv) and bias_correction_options (JSON).
