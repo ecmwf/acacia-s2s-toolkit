@@ -1,7 +1,7 @@
 [project]
 # Derive the version from Git tags and commits.
 #dynamic = ["version"]
-version = "2.56"
+version = "2.57"
 name = "acacia_s2s_toolkit"
 authors = [
   {name="Joshua Talib", email="joshuatalib@ecmwf.int" },
