@@ -513,7 +513,9 @@ def aggregate(
     into windows of `window_size` days with label="left", closed="left": each output lead
     time is the start of its window, e.g. with window_size=7, lead 7 days covers the daily
     leads 7 to 13. If the number of steps along `dim` is not a multiple of window_size,
-    the incomplete trailing window is dropped (with a log message). Grid cells that
+    the incomplete trailing window is dropped (with a log message). A window with any
+    missing day is NaN (with a log message), for every member and grid cell separately:
+    e.g. a lagged member that has not started yet, or a gap in the obs. Grid cells that
     are NaN at all leads (and members / valid times) in the input are NaN in the output.
 
     Parameters
@@ -597,6 +599,17 @@ def aggregate(
     #aggregating done here!
     aggdata = resampler.map(lambda da: func(da, dim=dim, **kwargs))
 
+    # windows with a missing day (e.g. a lagged member that has not started yet, or a gap
+    # in the obs) are NaN: a sum or count over fewer days would be wrong without warning
+    n_days = data.notnull().resample(**{dim: agg_window}, label="left", closed="left").sum()
+    complete = n_days == window_size
+    partial = (n_days > 0) & ~complete
+    n_partial = int(partial.sum()) if isinstance(partial, xr.DataArray) \
+        else int(sum(partial[v].sum() for v in partial.data_vars))
+    if n_partial:
+        _log(f"aggregate: {n_partial} window(s) with missing days set to NaN")
+    aggdata = aggdata.where(complete)
+
 
     #finding nans
     dims=[dim]
@@ -627,44 +640,42 @@ def aggregate(
 
 
 
-def _find_cycles(init_dates, max_gap=None):
-    """
-    Group sorted init dates into cycles of staggered initialisations.
+CYCLE_GAP = np.timedelta64(180, "D")
 
-    A new cycle starts wherever the gap to the previous init date exceeds `max_gap`.
+
+def _find_cycles(init_dates):
+    """
+    Group hindcast init dates into cycles, one per hindcast year.
+
+    Inits less than CYCLE_GAP (180 days) apart belong to the same cycle: the inits of a
+    lagged ensemble are days or weeks apart, the hindcast years a year apart. Grouping
+    by calendar year would split cycles whose inits straddle 1 January.
 
     Parameters
     ----------
     init_dates : array-like of datetime64
         Initialisation dates.
-    max_gap : timedelta-like (e.g. "10D"), optional
-        If None, it is inferred: with all gaps equal there is a single cycle (e.g. a
-        forecast); otherwise the threshold is the geometric mean of the smallest and
-        largest gap (2 days and ~1 year -> ~27 days).
 
     Returns
     -------
     numpy.ndarray
-        2-D array (n_cycles, n_inits_per_cycle) of dates; all cycles must have the same
-        number of inits.
+        2-D array (n_cycles, n_inits_per_cycle) of sorted dates.
+
+    Raises
+    ------
+    ValueError
+        If the cycles have different numbers of inits (e.g. an init missing in one year).
     """
-    dates = np.sort(np.asarray(init_dates))
-    if len(dates) == 1:
-        return dates[None, :]
-    gaps = np.diff(dates)
-    if max_gap is None:
-        g = gaps / np.timedelta64(1, "s")
-        if g.min() == g.max():
-            return dates[None, :]                               # one cycle
-        thresh = np.timedelta64(int(np.sqrt(g.min() * g.max())), "s")
-    else:
-        thresh = np.timedelta64(pd.Timedelta(max_gap).value, "ns")
-    starts = np.r_[0, np.flatnonzero(gaps > thresh) + 1]
-    groups = np.split(dates, starts[1:])
-    sizes = sorted({len(g) for g in groups})
-    if len(sizes) > 1:
-        raise ValueError(f"cycles have different numbers of inits {sizes} with a gap threshold "
-                         f"of {thresh.astype('timedelta64[h]')}; check the init dates or pass max_gap")
+    dates = np.sort(np.asarray(init_dates).astype("datetime64[ns]"))
+    starts = np.flatnonzero(np.diff(dates) > CYCLE_GAP) + 1
+    groups = np.split(dates, starts)
+    sizes = [len(g) for g in groups]
+    if len(set(sizes)) > 1:
+        detail = ", ".join(f"{str(g[0])[:4]}: {len(g)}" for g in groups
+                           if len(g) != max(set(sizes), key=sizes.count))
+        raise ValueError(f"hindcast years have different numbers of initialisations "
+                         f"({detail}; most have {max(set(sizes), key=sizes.count)}); "
+                         "check the hc_init_date values")
     return np.stack(groups)
 
 
@@ -679,10 +690,14 @@ def _check_daily_leads(leads, name):
                          "Restructure daily data first and aggregate afterwards.")
 
 
-def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim=False, max_gap=None,
-                      drop_coords=("valid_time",)):
+def hcst_to_effective_lead_time(ds, *, anchor="latest", trim=True):
     """
     Combine staggered hindcast initialisations into cycles with a common lead-time axis.
+
+    The inits of each hindcast year form one cycle: inits less than 180 days apart are
+    grouped together (see _find_cycles), so cycles may straddle 1 January. The effective
+    lead time axis always starts at the anchor: data of inits before the anchor that
+    fall before it are dropped.
 
     Parameters
     ----------
@@ -691,36 +706,46 @@ def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim
         (hc_init_date, lead_time, member, latitude, longitude).
         lead_time must be daily (timedelta, steps of 1 day); otherwise ValueError.
         Aggregate only after restructuring.
-    n_inits_per_cycle : int, optional
-        Number of initialisations per cycle. If None (default) the cycles are inferred
-        from gaps between init dates (see _find_cycles); if given, it is checked against
-        the inferred grouping.
-    anchor : {"earliest", "latest"}, optional
+    anchor : {"latest", "earliest"} or date, default "latest"
         Date that labels the cycle (valid_time) and from which effective_lead_time is
-        counted. Default: "earliest", or "latest" if trim=True.
+        counted.
 
-        - "earliest": later inits start later, so NaN at their first leads.
         - "latest": earlier inits are cut before the anchor and end earlier, so NaN at
-          their last leads.
+          their last leads (removed by trim).
+        - "earliest": later inits start later, so NaN at their first leads, and end
+          later (their last days are kept only with trim=False).
+        - a date (str, numpy.datetime64 or pandas.Timestamp), the nominal date, e.g.
+          the date of the forecast the hindcast accompanies: only its month and day are
+          used, and in each cycle the anchor is the date with that month and day nearest
+          to the cycle's inits. It need not be an init date, but must be whole days from
+          them. Inits before it have negative init_lag (NaN at their last leads), inits
+          after it positive init_lag (NaN at their first leads). 29 February is not
+          accepted. fcst_to_effective_lead_time always anchors the forecast at its
+          latest initialisation, so for matching hindcast and forecast use that date.
 
-        The effective_lead_time axis has the values of lead_time (minus the trailing
-        leads removed by trim); it starts at 0 only if lead_time starts at 0.
-    trim : bool, default False
-        If True, keep only effective lead times covered by every initialisation (no NaN
-        from the staggering). Requires anchor="latest" (the default when trim=True); the
-        trailing leads where earlier inits have already ended are removed.
-    max_gap : timedelta-like, optional
-        Passed to _find_cycles; only needed if the automatic grouping fails.
-    drop_coords : tuple of str, default ("valid_time",)
-        Coordinates along (hc_init_date, lead_time) to drop; they would be wrong after
-        shifting. 'target_time' (= valid_time + effective_lead_time) is added instead.
+        The effective_lead_time axis starts at the first lead_time (so at 0 only if
+        lead_time starts at 0).
+    trim : bool, default True
+        Where the effective_lead_time axis ends:
+
+        - True: at the end of the init that ends first, so that every init has data up
+          to the last effective lead time; after aggregation, the last window is the
+          last one complete for all inits (aggregate() drops the partial window after
+          it).
+        - False: at the end of the init that ends last (with inits after the anchor,
+          beyond the last lead_time), so that every window complete for at least one
+          init is kept; the other inits are NaN there.
+
+        The first effective lead times are never removed: inits after the anchor have
+        NaN there, and aggregate() sets their first window(s) to NaN, so these inits
+        simply contribute fewer members there.
 
     Returns
     -------
     xarray.Dataset or xarray.DataArray
         Same type as ds, dims (valid_time, effective_lead_time, member, ...), with:
 
-        - valid_time: the anchor init date of each cycle
+        - valid_time: the anchor date of each cycle
         - effective_lead_time: timedelta64[ns]
         - member: members of all inits of the cycle (n_inits x n_members)
         - init_date (valid_time, member): actual initialisation date of each member
@@ -728,48 +753,60 @@ def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim
         - target_time (valid_time, effective_lead_time)
 
         plus any other coordinates along (hc_init_date, member), e.g. 'lag', as
-        (valid_time, member). Data variables are float with NaN where an initialisation
-        has no data; their on-disk packing (integer dtype, scale_factor, _FillValue) is
-        cleared so that NaN survives saving.
+        (valid_time, member). The hindcast's own valid_time coordinate (along
+        hc_init_date, lead_time) is dropped: it would be wrong after shifting, and
+        target_time replaces it. Data variables are float with NaN where an
+        initialisation has no data; their on-disk packing (integer dtype, scale_factor,
+        _FillValue) is cleared so that NaN survives saving.
 
     Raises
     ------
     ValueError
         If ds lacks one of the dimensions hc_init_date, lead_time, member; if anchor is
-        invalid or trim=True with anchor="earliest"; if lead_time is not daily; if the
-        cycles found do not match n_inits_per_cycle or have different numbers of inits;
-        if inits within a cycle are not whole days apart.
+        invalid; if lead_time is not daily; if the hindcast years have different numbers
+        of inits; if inits within a cycle (or the nominal date and the inits) are not
+        whole days apart; if trim leaves no lead time.
     """
     init_dim, lead_dim, member_dim = "hc_init_date", "lead_time", "member"
     _require_dims(ds, (init_dim, lead_dim, member_dim), "hindcast")
-    if anchor is None:
-        anchor = "latest" if trim else "earliest"
-    if anchor not in ("earliest", "latest"):
-        raise ValueError("anchor must be 'earliest' or 'latest'")
-    if trim and anchor != "latest":
-        raise ValueError("trim=True requires anchor='latest'")
+    nominal = None if isinstance(anchor, str) and anchor in ("earliest", "latest") \
+        else _parse_nominal(anchor)
     _check_daily_leads(ds[lead_dim].values, lead_dim)
-    ds = ds.drop_vars([c for c in drop_coords if c in ds.coords]).sortby(init_dim)
+    # the hindcast's valid_time (hc_init_date + lead_time) would be wrong after shifting
+    ds = ds.drop_vars("valid_time", errors="ignore").sortby(init_dim)
 
-    cycles = _find_cycles(ds[init_dim].values, max_gap)
-    if n_inits_per_cycle is not None and cycles.shape[1] != n_inits_per_cycle:
-        raise ValueError(f"found {cycles.shape[1]} inits per cycle in the data, "
-                         f"but n_inits_per_cycle={n_inits_per_cycle}")
+    cycles = _find_cycles(ds[init_dim].values)
     if ((cycles - cycles[:, :1]) % ONE_DAY).any():
         raise ValueError("inits within a cycle must be whole days apart")
 
-    leads = ds[lead_dim].values
+    leads = ds[lead_dim].values.astype("timedelta64[ns]")
     n_mem = ds.sizes[member_dim]
 
+    if nominal is not None:
+        anchors = np.array([_nominal_in_cycle(nominal, dates) for dates in cycles])
+        if ((cycles - anchors[:, None]) % ONE_DAY).any():
+            raise ValueError("the nominal date must be whole days from the init dates")
+        lags = (cycles - anchors[:, None]) / ONE_DAY
+        _log(f"nominal date {nominal.strftime('%d %b')}: init lags from {lags.min():+.0f} "
+             f"to {lags.max():+.0f} days")
+    else:
+        anchors = cycles[:, 0] if anchor == "earliest" else cycles[:, -1]
+
+    # effective lead time axis: from the anchor (first lead_time) to the end of the init
+    # that ends last; a member with init_lag l covers leads[0] + l to leads[-1] + l
+    lags_all = (cycles - anchors[:, None]).astype("timedelta64[ns]")
+    zero = np.timedelta64(0, "ns")
+    end = leads[-1] + max(lags_all.max(), zero)
+    axis = np.arange(leads[0], end + ONE_DAY, ONE_DAY).astype("timedelta64[ns]")
+
     out_cycles = []
-    for dates in cycles:
-        a = dates[0] if anchor == "earliest" else dates[-1]
+    for dates, a in zip(cycles, anchors):
         parts = []
         for k, d in enumerate(dates):
-            offset = d - a                                   # >= 0 (earliest) or <= 0 (latest)
+            offset = d - a                                   # init_lag: < 0 before, > 0 after anchor
             x = ds.sel({init_dim: d}, drop=True)
             # value at original lead L belongs to effective lead L + offset
-            x = x.assign_coords({lead_dim: x[lead_dim] + offset}).reindex({lead_dim: leads})
+            x = x.assign_coords({lead_dim: x[lead_dim] + offset}).reindex({lead_dim: axis})
             x = x.assign_coords({member_dim: np.arange(k * n_mem, (k + 1) * n_mem,
                                                        dtype=ds[member_dim].dtype),
                                  "init_date": (member_dim, np.full(n_mem, d)),
@@ -786,10 +823,13 @@ def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim
     out = out.assign_coords(effective_lead_time=out["effective_lead_time"].astype("timedelta64[ns]"))
 
     if trim:
-        # leads covered by every init in every cycle, from the offsets (not from the data,
-        # which may contain genuine NaN, e.g. over the ocean)
-        lags = out["init_lag"].values                        # (valid_time, member), <= 0
-        last = leads[-1] + lags.min()                        # earliest init ends first
+        # last lead covered by every init in every cycle, from the offsets (not from the
+        # data, which may contain genuine NaN, e.g. over the ocean): the init that ends
+        # first ends at leads[-1] + its init_lag (or at leads[-1], for lags >= 0)
+        last = leads[-1] + min(lags_all.min(), zero)
+        if last < leads[0]:
+            raise ValueError("trim=True leaves no lead time: the inits are further apart than "
+                             "the length of the lead_time axis")
         out = out.sel(effective_lead_time=slice(leads[0], last))
 
     out = out.assign_coords(target_time=out["valid_time"] + out["effective_lead_time"])
@@ -802,10 +842,15 @@ def hcst_to_effective_lead_time(ds, n_inits_per_cycle=None, *, anchor=None, trim
 
 
 
-def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
+def fcst_to_effective_lead_time(fc, *, leads=None):
     """
-    Bring a forecast that is already on a calendar-date axis into the same format as
-    hcst_to_effective_lead_time(hindcast, trim=True).
+    Bring a forecast that is already on a calendar-date axis into the effective lead
+    time-aligned format of hcst_to_effective_lead_time.
+
+    The download function delivers the forecast trimmed to the latest initialisation, so
+    the anchor is always the latest initialisation: valid_time is the first date, from
+    the latest initialisation on, at which every member has data, and all init_lag are
+    zero or negative.
 
     Input: (valid_time, member, latitude, longitude), daily, where valid_time are target
     dates and each member has its initialisation date in coordinate fc_init_date
@@ -813,14 +858,16 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
 
     Output: (valid_time: 1, effective_lead_time, member, latitude, longitude), with:
 
-    - valid_time: first date (from the latest initialisation on) at which every member
-      has data
+    - valid_time: the anchor (see above)
     - effective_lead_time: target date - valid_time, starting at 0. This matches the
       hindcast only if the hindcast's lead_time starts at 0
       (hcst_to_effective_lead_time keeps the lead_time values).
     - coords init_date, init_lag (= init_date - valid_time) (valid_time, member),
       target_time (valid_time, effective_lead_time), and other member coords
       (e.g. 'lag') as (valid_time, member).
+
+    The forecast's own lead_time coordinate (along valid_time, member) is dropped: it
+    differs between members, and init_lag and target_time replace it.
 
     Parameters
     ----------
@@ -829,10 +876,8 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
     leads : array-like of timedelta, optional
         Effective lead times to keep, e.g. hcst.effective_lead_time, so that forecast and
         hindcast have identical lead axes; an error is raised if a requested lead is
-        missing or if any member has no data at it. If None, all leads up to the last one
-        at which every member has data are kept (like trim=True).
-    drop_coords : tuple of str, default ("lead_time",)
-        Coordinates to drop, e.g. the forecast's own lead_time.
+        missing or if any member has no data at it. If None, the leads at which every
+        member has data are kept.
 
     Returns
     -------
@@ -853,8 +898,9 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
                          "of each member)")
     t = fc[time_dim].values
     _check_daily_leads(t - t[0], time_dim)
-    fc = fc.drop_vars([c for c in drop_coords if c in fc.coords])
-    anchor = fc[init_coord].values.max()
+    # the forecast's lead_time differs between members; init_lag and target_time replace it
+    fc = fc.drop_vars("lead_time", errors="ignore")
+    start = fc[init_coord].values.max()                    # the latest initialisation
 
     def gaps(o):
         """True at dates where any member has no data anywhere in the domain."""
@@ -864,13 +910,14 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
         return g.any(member_dim).values
 
     # dates from the latest init on; the first date with data from every member is lead 0
-    out = fc.isel({time_dim: np.flatnonzero(fc[time_dim].values >= anchor)})
+    out = fc.isel({time_dim: np.flatnonzero(fc[time_dim].values >= start)})
     ok = np.flatnonzero(~gaps(out))
     if ok.size == 0:
         raise ValueError("no date at which every member has data")
     out = out.isel({time_dim: slice(ok[0], None)})
     dates = out[time_dim].values
-    out = (out.assign_coords(effective_lead_time=(time_dim, (dates - dates[0]).astype("timedelta64[ns]")),
+    vt = dates[0]                                          # effective lead 0
+    out = (out.assign_coords(effective_lead_time=(time_dim, (dates - vt).astype("timedelta64[ns]")),
                              target_time=(time_dim, dates))
               .swap_dims({time_dim: "effective_lead_time"})
               .drop_vars(time_dim))
@@ -879,8 +926,10 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
         return gaps(o.rename({"effective_lead_time": time_dim}))
 
     if leads is None:
+        # the leads at which every member has data: up to the last one before the
+        # earliest init ends
         bad = np.flatnonzero(gap_leads(out))
-        if bad.size:                                       # trailing gaps: earlier inits ended
+        if bad.size:
             out = out.isel(effective_lead_time=slice(0, bad[0]))
     else:
         leads = np.asarray(leads).astype("timedelta64[ns]")
@@ -892,7 +941,6 @@ def fcst_to_effective_lead_time(fc, *, leads=None, drop_coords=("lead_time",)):
         if bad.size:
             raise ValueError(f"some members have no data at leads {bad.astype('timedelta64[D]')}")
 
-    vt = dates[0]                                          # effective lead 0
     out = out.drop_vars("target_time")
     out = out.rename({init_coord: "init_date"})
     out = out.assign_coords(init_lag=out["init_date"] - vt)
@@ -915,6 +963,25 @@ def _clear_packing(obj):
 
 
 ONE_DAY = np.timedelta64(1, "D")
+
+
+def _parse_nominal(anchor):
+    """Nominal date given as anchor -> pandas.Timestamp at midnight."""
+    try:
+        ts = pd.Timestamp(anchor).normalize()
+    except (ValueError, TypeError):
+        raise ValueError(f"anchor must be 'earliest', 'latest' or a date, got {anchor!r}") from None
+    if ts.month == 2 and ts.day == 29:
+        raise ValueError("29 February cannot be used as a nominal date (it does not exist in "
+                         "every hindcast year); use 28 February or 1 March")
+    return ts
+
+
+def _nominal_in_cycle(nominal, dates):
+    """The date with the month and day of `nominal` nearest to the centre of `dates`."""
+    centre = pd.Timestamp(dates.min() + (dates.max() - dates.min()) / 2)
+    cands = [nominal.replace(year=y) for y in (centre.year - 1, centre.year, centre.year + 1)]
+    return np.datetime64(min(cands, key=lambda t: abs(t - centre)), "ns")
 
 
 def _require_dims(obj, dims, what):
