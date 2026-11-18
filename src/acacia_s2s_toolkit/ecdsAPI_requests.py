@@ -96,15 +96,18 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin in ('rjtd', 'rksl') and leadtimes.startswith('0') and ('accumulated' in time_resolution):
-            print ('need to add zero time')
-            add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
-            add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
-            control_fn = f'{filename}_controlZEROADDED_{lag}'
-            pert_fn = f'{filename}_perturbedZEROADDED_{lag}'
-        else:
-            control_fn = f'{filename}_control2_{lag}'
-            pert_fn = f'{filename}_perturbed_{lag}'
+        control_fn = f'{filename}_control2_{lag}'
+        pert_fn = f'{filename}_perturbed_{lag}'
+
+        if leadtimes.startswith('0') and ('accumulated' in time_resolution):
+            with xr.open_dataset(f'{filename}_control2_{lag}', engine='cfgrib') as control:
+                step_days = control.step.astype("timedelta64[D]").astype(int)
+                if 0 not in step_days:
+                    print ('need to add zero time')
+                    add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
+                    add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
+                    control_fn = f'{filename}_controlZEROADDED_{lag}'
+                    pert_fn = f'{filename}_perturbedZEROADDED_{lag}'
 
         with xr.open_dataset(control_fn, engine='cfgrib') as control, \
                      xr.open_dataset(pert_fn, engine='cfgrib') as pert:
@@ -143,6 +146,7 @@ def request_forecast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # if daily averaged field, shift time back one day
         if time_resolution == 'averaged_24hrs':
             combined_forecast = combined_forecast.assign_coords(valid_time=combined_forecast.valid_time - np.timedelta64(24, 'h'))
+            combined_forecast = combined_forecast.assign_coords(lead_time=combined_forecast.lead_time - np.timedelta64(24, 'h'))
         combined_forecast= aggregation_process(combined_forecast,variable,start_lt,period)
         time_label='time label denotes start of period'
     else:
@@ -255,15 +259,19 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         # get variable resolution
         time_resolution = argument_output.get_timeresolution(variable)
 
-        if origin in ('rjtd', 'rksl') and leadtimes.startswith('0') and ('accumulated' in time_resolution):
-            print ('need to add zero time')
-            add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
-            add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
-            control_fn = f'{filename}_controlZEROADDED_{lag}'
-            pert_fn = f'{filename}_perturbedZEROADDED_{lag}'
-        else:
-            control_fn = f'{filename}_control2_{lag}'
-            pert_fn = f'{filename}_perturbed_{lag}'
+        # adding a zero lead time if (1) zero lead time is requested, (2) an accumulated field is requested, (3) zero time step is not found when opening control dataset
+        control_fn = f'{filename}_control2_{lag}'
+        pert_fn = f'{filename}_perturbed_{lag}'
+
+        if leadtimes.startswith('0') and ('accumulated' in time_resolution):
+            with xr.open_dataset(f'{filename}_control2_{lag}', engine='cfgrib') as control:
+                step_days = control.step.astype("timedelta64[D]").astype(int)
+                if 0 not in step_days:
+                    print ('need to add zero time')
+                    add_zero_time(f'{filename}_control2_{lag}',f'{filename}_controlZEROADDED_{lag}')
+                    add_zero_time(f'{filename}_perturbed_{lag}',f'{filename}_perturbedZEROADDED_{lag}')
+                    control_fn = f'{filename}_controlZEROADDED_{lag}'
+                    pert_fn = f'{filename}_perturbedZEROADDED_{lag}'
 
         with xr.open_dataset(control_fn, engine='cfgrib') as control, \
              xr.open_dataset(pert_fn, engine='cfgrib') as pert:
@@ -284,8 +292,6 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
                 )
             ds.to_netcdf(f"{filename}_allens_{lag}.nc")
 
-        
-
     # create new 'member' dimension based on same date. For instance, 5 members per date and three initialisations used
     # same process following even with one forecast initialisation date to ensure same structure for all output. 
     combined_forecast = merge_lag_ensemble.merge_all_ens_hindcasts(f'{filename}',leveltype)
@@ -295,7 +301,8 @@ def request_hindcast(fcdate,origin,grid,variable,area,data_format,webapi_param,l
         time_resolution = argument_output.get_timeresolution(variable)
         # if daily averaged field, shift time back one day
         if time_resolution == 'averaged_24hrs':
-            combined_forecast = combined_forecast.assign_coords(lead_time=combined_forecast.lead_time - np.timedelta64(1, 'D'))
+            combined_forecast = combined_forecast.assign_coords(valid_time=combined_forecast.valid_time - np.timedelta64(24, 'h'))
+            combined_forecast = combined_forecast.assign_coords(lead_time=combined_forecast.lead_time - np.timedelta64(24, 'h'))
         combined_forecast= aggregation_process(combined_forecast,variable,start_lt,period,hindcast=True)
         time_label='time label denotes start of period'
     else:
@@ -412,28 +419,50 @@ def add_zero_time(input_file, output_file):
 ### 
 # aggregation processes. either accumulate or averaging.
 ###
-def accumulate_single_fc(fc, start_lt,dim='valid_time'):
-    start_coords = fc[dim].isel({dim: slice(0, -1)})
+def accumulate_single_fc(fc, start_lt, dim='valid_time'):
+    if dim not in ('valid_time', 'lead_time'):
+        raise ValueError("dim must be 'valid_time' or 'lead_time'")
+
+    # Save both coordinates using exactly the same positions
+    idx = {dim: slice(0, -1)}
+    start_valid_times = fc['valid_time'].isel(idx)
+    start_lead_times = fc['lead_time'].isel(idx)
+
+    # Deaccumulate along chosen dimension
     fc = fc.diff(dim=dim)
-    fc = fc.assign_coords({dim: start_coords})
+
+    # Align both coordinates with the start of each interval
+    fc = fc.assign_coords(valid_time=start_valid_times,lead_time=start_lead_times,)
+
     # First interval is only needed to establish the accumulation
     # at start_lt, so remove it from the output.
     if start_lt > 0:
         fc = fc.isel({dim: slice(1, None)})
+
     return fc
 
 
-def average_single_fc(fc, period,dim='valid_time'):
+def average_single_fc(fc, period, dim='valid_time'):
+    if dim not in ('valid_time', 'lead_time'):
+        raise ValueError("dim must be 'valid_time' or 'lead_time'")
+
     # e.g. '7D' -> 7
     n_days = int(period[:-1])
-    # trim to complete periods
-    n_complete = (fc.sizes[dim] // n_days) * n_days
-    # Save start coordinate before aggregation
-    start_coords = fc[dim].isel({dim: slice(0, n_complete, n_days)})
 
+    # Trim to complete periods
+    n_complete = (fc.sizes[dim] // n_days) * n_days
+
+    # Same positional selection for BOTH coordinates
+    idx = {dim: slice(0, n_complete, n_days)}
+    start_valid_times = fc['valid_time'].isel(idx)
+    start_lead_times = fc['lead_time'].isel(idx)
+
+    # Average along chosen dimension
     fc = (fc.isel({dim: slice(0, n_complete)}).coarsen({dim: n_days}, boundary='trim').mean())
-    # Force coordinate to start of averaging period
-    fc = fc.assign_coords({dim: start_coords})
+
+    # Align both coordinates with the start of each averaging period
+    fc = fc.assign_coords(valid_time=start_valid_times,lead_time=start_lead_times,)
+
     return fc
 
 def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
@@ -445,9 +474,9 @@ def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
     time_resolution = argument_output.get_timeresolution(variable)
     if not hindcast:
         if 'accumulated' in time_resolution:
-            forecast = accumulate_single_fc(forecast,start_lt)
+            forecast = accumulate_single_fc(forecast,start_lt,dim='valid_time')
         else:
-            forecast = average_single_fc(forecast,period)
+            forecast = average_single_fc(forecast,period,dim='valid_time')
     else:
         processed_hindcasts = []
         for hc_init, hc_run in forecast.groupby('hc_init_date'):

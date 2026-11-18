@@ -42,16 +42,18 @@ After this, use `download_forecast` to download operational forecasts:
 
 :Optional parameters:
 
-- **model** (*str*): The forecasting model. If not specified, defaults to ``'ECMWF'``. A full summary of models including their forecast frequency and data access delay can be found on `ECMWF's Model page <https://confluence.ecmwf.int/display/S2S/Models>`_.  Supported models (as of 6th November 2025) include:
+- **model** (*str*): The forecasting model. Defaults to ``'ECMWF'`` if not specified. A full summary of models, including their forecast frequency and data access delay, can be found on `ECMWF's Model page <https://confluence.ecmwf.int/display/S2S/Models>`_. Support is prioritised for models with a 48-hour data access delay. Supported models (as of 18th November 2026) include:
 
-  - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts (default)
+  - ``'CMA'``: China Meteorological Administration
+  - ``'CNR-ISAC'``: National Research Council of Italy – Institute of Atmospheric Sciences and Climate
   - ``'ECCC'``: Environment and Climate Change Canada
+  - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts (default)
   - ``'HMCR'``: Hydrometeorological Centre of Russia
+  - ``'IAP-CAS'``: Institute of Atmospheric Physics of the Chinese Academy of Sciences (note, only certain parameters available)
   - ``'JMA'``: Japan Meteorological Agency
   - ``'KMA'``: Korea Meteorological Administration
   - ``'NCEP'``: National Centers for Environmental Prediction (NOAA/USA)
-  - ``'CMA'``: China Meteorological Administration
-
+  
 - **fcdate** (*str*, optional): Forecast initialisation date in ``YYYYMMDD`` format. If no date is given, then the latest avaliable forecast is downloaded.
 
 - **start_lt** (*int or str*, optional): First lead time (in hours) to include in the downloaded forecast. For example, ``24`` starts from day 1, while ``168`` starts from week 2. Alternatively, a day of the week (e.g. ``"monday"``, ``"tuesday"``) can be provided. In this case, the lead time is automatically calculated so that the forecast starts on the next occurrence of the requested day relative to ``fcdate``. If not specified, defaults to ``0``.

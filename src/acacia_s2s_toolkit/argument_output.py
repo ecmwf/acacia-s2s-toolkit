@@ -262,6 +262,29 @@ def output_hc_lags(origin_id,fcdate):
         closest_rf = min(candidates, key=lambda d: abs((d - fcdate_obj).days))
         lag = (closest_rf - fcdate_obj).days
         return lag
+    if "nearestDOM_CPTEC" == lag_type: # different behaviour for CPTEC as they produce forecasts for every 7th day, i.e. not the same choice of day-of-year for every reforecast year
+        # generate full set of reforecast dates.
+        rf_start = datetime(1999, 1, 6)
+        rf_end = datetime(2018, 12, 31)
+
+        rf_dates = []
+        date = rf_start
+        
+        while date <= rf_end:
+            rf_dates.append(date)
+            date += timedelta(days=7)
+        selected_rf_dates = {}
+        for year in range(1999, 2019):
+            target = fc_date_dt.replace(year=year)
+        
+            closest = min(
+                rf_dates,
+                key=lambda d: abs(d - target),
+            )
+        
+            selected_rf_dates[year] = closest
+        
+        return selected_rf_dates # for CPTEC, actually return dictionary of dates for each year.
     # ------ Before/after DOM -----------------
     if "before_after_DOM" == lag_type:
         # Build candidate reforecast dates in prev/current/next month
