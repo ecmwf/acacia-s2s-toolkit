@@ -16,6 +16,7 @@ from pathlib import Path
 import acacia_s2s_toolkit
 import json
 import pandas as pd
+from collections import defaultdict
 
 def get_ecds_client():
     os.environ["CDSAPI_RC"] = os.path.expanduser("~/.cdsapirc.ecds")
@@ -488,4 +489,42 @@ def aggregation_process(forecast,variable,start_lt,period,hindcast=False):
         forecast = xr.concat(processed_hindcasts,dim='hc_init_date').sortby('hc_init_date')
 
     return forecast
+
+def build_reforecast_date_groups(origin,lagged_fcdate,rf_years,):
+    """
+    Return request groups containing hyear, hmonth and hday.
+    Each group can be submitted as one ECDS request.
+    """
+
+    rf_years = [int(year) for year in np.atleast_1d(rf_years)]
+
+    if origin != "sbsj":
+        return [
+            {
+                "hyear": [str(year) for year in rf_years],
+                "hmonth": lagged_fcdate.strftime("%m"),
+                "hday": lagged_fcdate.strftime("%d"),
+            }
+        ]
+
+    selected_dates = argument_output.output_hc_lags(origin,lagged_fcdate)
+
+    grouped_years = defaultdict(list)
+
+    for year in rf_years:
+        selected_date = selected_dates[year]
+        key = (
+            selected_date.strftime("%m"),
+            selected_date.strftime("%d"),
+        )
+        grouped_years[key].append(year)
+
+    return [
+        {
+            "hyear": [str(year) for year in years],
+            "hmonth": month,
+            "hday": day,
+        }
+        for (month, day), years in sorted(grouped_years.items())
+    ]
 

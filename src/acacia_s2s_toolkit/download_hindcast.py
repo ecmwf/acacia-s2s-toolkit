@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # download sub-seasonal reforecast from S2S Database
-from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requests, download_S2Stc_tracks, grid_functions
+from acacia_s2s_toolkit import argument_check, argument_output, ecdsAPI_requestsV2, download_S2Stc_tracks, grid_functions
 import os
 import sys
 import datetime
@@ -241,12 +241,12 @@ def download_hindcast(variable,
     try:
         if variable != 'TC_TRACKS':
             if verbose:
-                ecdsAPI_requests.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
+                ecdsAPI_requestsV2.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
                                                       webapi_param,leadtime_hour,period,leveltype,filename_save,plevs,
                                                       rf_enslags,rf_years,start_lt,aggregation_switch,cleanup=cleanup)
             else:
                 with SuppressOutput():
-                    ecdsAPI_requests.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
+                    ecdsAPI_requestsV2.request_hindcast(fcdate,origin_id,grid_for_request,variable,bbox_bounds,data_format,
                                                       webapi_param,leadtime_hour,period,leveltype,filename_save,plevs,
                                                       rf_enslags,rf_years,start_lt,aggregation_switch,cleanup=cleanup)
         elif variable == 'TC_TRACKS':

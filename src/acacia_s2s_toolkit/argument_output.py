@@ -275,16 +275,47 @@ def output_hc_lags(origin_id,fcdate):
             date += timedelta(days=7)
         selected_rf_dates = {}
         for year in range(1999, 2019):
-            target = fc_date_dt.replace(year=year)
-        
-            closest = min(
-                rf_dates,
-                key=lambda d: abs(d - target),
+            # Avoid problems if fc_date_dt is 29 February.
+            try:
+                target = fcdate_obj.replace(year=year)
+            except ValueError:
+                target = fcdate_obj.replace(year=year, day=28)
+
+            # Restrict candidates to the relevant reforecast year.
+            year_dates = [date for date in rf_dates if date.year == year]
+
+            selected_rf_dates[year] = min(
+                year_dates,
+                key=lambda date: abs(date - target),
             )
-        
-            selected_rf_dates[year] = closest
-        
         return selected_rf_dates # for CPTEC, actually return dictionary of dates for each year.
+    if "nearestDOM_CNRM" == lag_type: # different behaviour for CNRM as they produce forecasts for every 7th day, i.e. not the same choice of day-of-year for every reforecast year
+        # generate full set of reforecast dates.
+        rf_start = datetime(1992, 12, 31)
+        rf_end = datetime(2017, 12, 28)
+
+        rf_dates = []
+        date = rf_start
+
+        while date <= rf_end:
+            rf_dates.append(date)
+            date += timedelta(days=7)
+        selected_rf_dates = {}
+        for year in range(1993, 2017):
+            # Avoid problems if fc_date_dt is 29 February.
+            try:
+                target = fcdate_obj.replace(year=year)
+            except ValueError:
+                target = fcdate_obj.replace(year=year, day=28)
+
+            # Restrict candidates to the relevant reforecast year.
+            year_dates = [date for date in rf_dates if date.year == year]
+
+            selected_rf_dates[year] = min(
+                year_dates,
+                key=lambda date: abs(date - target),
+            )
+        return selected_rf_dates # for CNRM (pre-20251106), actually return dictionary of dates for each year.
     # ------ Before/after DOM -----------------
     if "before_after_DOM" == lag_type:
         # Build candidate reforecast dates in prev/current/next month

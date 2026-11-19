@@ -46,6 +46,8 @@ After this, use `download_forecast` to download operational forecasts:
 
   - ``'CMA'``: China Meteorological Administration
   - ``'CNR-ISAC'``: National Research Council of Italy – Institute of Atmospheric Sciences and Climate
+  - ``'CNRM'``: Centre National de Recherches Météorologiques - Météo-France 
+  - ``'CPTEC'``: Centro de Previsão de Tempo e Estudos Climáticos - Brazil's National Institute for Space Research (INPE)
   - ``'ECCC'``: Environment and Climate Change Canada
   - ``'ECMWF'``: European Centre for Medium-Range Weather Forecasts (default)
   - ``'HMCR'``: Hydrometeorological Centre of Russia
@@ -53,7 +55,8 @@ After this, use `download_forecast` to download operational forecasts:
   - ``'JMA'``: Japan Meteorological Agency
   - ``'KMA'``: Korea Meteorological Administration
   - ``'NCEP'``: National Centers for Environmental Prediction (NOAA/USA)
-  
+  - ``'UKMO'``: U.K. Met Office
+
 - **fcdate** (*str*, optional): Forecast initialisation date in ``YYYYMMDD`` format. If no date is given, then the latest avaliable forecast is downloaded.
 
 - **start_lt** (*int or str*, optional): First lead time (in hours) to include in the downloaded forecast. For example, ``24`` starts from day 1, while ``168`` starts from week 2. Alternatively, a day of the week (e.g. ``"monday"``, ``"tuesday"``) can be provided. In this case, the lead time is automatically calculated so that the forecast starts on the next occurrence of the requested day relative to ``fcdate``. If not specified, defaults to ``0``.
